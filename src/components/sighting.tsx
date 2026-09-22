@@ -1,4 +1,5 @@
 import { formatLocalizedNames } from "../../lib/bird-names";
+import { googleImagesUrl } from "@/lib/google-images";
 import { confidenceLabel, type Sighting } from "@/lib/sighting";
 import { wikipediaUrl } from "@/lib/wikipedia";
 
@@ -32,7 +33,7 @@ export function SightingResult({
             {confidenceLabel(sighting.confidence)} · {date}
           </p>
           <SightingNotes sighting={sighting} />
-          <WikipediaLink sighting={sighting} />
+          <SightingLinks sighting={sighting} />
         </div>
       </article>
     );
@@ -55,7 +56,7 @@ export function SightingResult({
           {confidenceLabel(sighting.confidence)} · {date}
         </p>
         <SightingNotes sighting={sighting} />
-        <WikipediaLink sighting={sighting} />
+        <SightingLinks sighting={sighting} />
       </div>
     </article>
   );
@@ -73,16 +74,30 @@ function LocalizedNameList({ names }: { names: Sighting["names"] }) {
   );
 }
 
-function WikipediaLink({ sighting }: { sighting: Sighting }) {
+function SightingLinks({ sighting }: { sighting: Sighting }) {
+  const imagesUrl = googleImagesUrl(sighting.names?.en ?? sighting.commonName);
+
   return (
-    <a
-      className="mt-3 inline-block text-moss underline underline-offset-4"
-      href={wikipediaUrl(sighting.scientificName, navigator.language)}
-      target="_blank"
-      rel="noreferrer"
-    >
-      View on Wikipedia
-    </a>
+    <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+      <a
+        className="text-moss underline underline-offset-4"
+        href={wikipediaUrl(sighting.scientificName, navigator.language)}
+        target="_blank"
+        rel="noreferrer"
+      >
+        View on Wikipedia
+      </a>
+      {imagesUrl ? (
+        <a
+          className="text-moss underline underline-offset-4"
+          href={imagesUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Google Images
+        </a>
+      ) : null}
+    </p>
   );
 }
 

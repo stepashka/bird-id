@@ -9,20 +9,12 @@ export class AuthError extends Error {
 
 export async function resolveUserId(input: {
   authorization: string | undefined;
-  invokeSecretHeader: string | undefined;
-  userIdHeader: string | undefined;
   jwksUrl: string | undefined;
-  invokeSecret: string | undefined;
+  invokeSecretHeader?: string | undefined;
+  userIdHeader?: string | undefined;
+  invokeSecret?: string | undefined;
 }): Promise<string> {
   const bearer = input.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-
-  if (input.invokeSecret && bearer === input.invokeSecret) {
-    const userId = input.userIdHeader?.trim();
-    if (!userId) {
-      throw new AuthError("Sign in to identify a bird.");
-    }
-    return userId;
-  }
 
   if (bearer && input.jwksUrl) {
     const jwks = createRemoteJWKSet(new URL(input.jwksUrl));

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AuthError, resolveUserId } from "./auth";
 
 describe("resolveUserId", () => {
-  it("accepts the Next.js invoke secret plus user id", async () => {
+  it("rejects the legacy invoke secret and user-id headers", async () => {
     await expect(
       resolveUserId({
         authorization: "Bearer test-secret",
@@ -11,7 +11,7 @@ describe("resolveUserId", () => {
         jwksUrl: undefined,
         invokeSecret: "test-secret",
       }),
-    ).resolves.toBe("user-123");
+    ).rejects.toBeInstanceOf(AuthError);
   });
 
   it("rejects a missing session", async () => {

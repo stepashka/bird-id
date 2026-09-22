@@ -1,34 +1,38 @@
-"use client";
-
 import { useEffect, useState } from "react";
-import { SightingResult, type Sighting } from "@/components/sighting";
-import { authClient } from "@/lib/auth/client";
+import { SightingResult } from "@/components/sighting";
+import { birdApi } from "@/lib/neon-auth";
+import type { Sighting } from "@/lib/sighting";
 
-export default function LogPage() {
-  const { data: session, isPending } = authClient.useSession();
+export function HistoryPanel({ userId }: { userId: string }) {
   const [items, setItems] = useState<Sighting[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadedForUser, setLoadedForUser] = useState<string | null>(null);
 
   useEffect(() => {
-    const userId = session?.user?.id;
-    if (isPending || !userId) return;
+    let active = true;
 
-    fetch("/api/history")
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) {
-          setError(payload.error || "Could not load history.");
-          return;
-        }
-        setItems(payload.items ?? []);
+    birdApi
+      .request<{ items: Sighting[] }>("/history")
+      .then((payload) => {
+        if (active) setItems(payload.items);
       })
-      .catch(() => setError("Could not load history."))
-      .finally(() => setLoadedForUser(userId));
-  }, [isPending, session?.user]);
+      .catch((caught) => {
+        if (active) {
+          setError(
+            caught instanceof Error ? caught.message : "Could not load history.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadedForUser(userId);
+      });
 
-  const loading =
-    isPending || (!!session?.user && loadedForUser !== session.user.id);
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  const loading = loadedForUser !== userId;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 pb-20">
@@ -39,8 +43,6 @@ export default function LogPage() {
 
       {loading ? (
         <p className="mt-10 text-lichen">Loading the log…</p>
-      ) : !session?.user ? (
-        <p className="mt-10 text-dusk">Sign in to see birds you have already named.</p>
       ) : error ? (
         <p className="mt-10 text-dusk" role="alert">
           {error}

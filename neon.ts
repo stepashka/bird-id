@@ -11,8 +11,7 @@ export default defineConfig({
       name: "Bird ID API",
       source: "./functions/api.ts",
       env: {
-        FUNCTION_INVOKE_SECRET: process.env.FUNCTION_INVOKE_SECRET ?? "",
-        NEON_AI_MODEL: process.env.NEON_AI_MODEL ?? "gpt-5-mini",
+        NEON_AI_MODEL: process.env.NEON_AI_MODEL ?? "llama-4-maverick",
       },
     },
   },

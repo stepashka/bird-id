@@ -1,67 +1,87 @@
 # Fieldmark
 
-Photograph a bird. The service names the species and stores the identification on your account.
+Photograph a bird, identify the species, and keep a private field log.
 
-## Stack
+This branch is a static React app designed for **GitHub Pages + Neon**:
 
-- Next.js UI (Vercel / `npm run dev`)
-- Neon backend from `neon.ts`: Postgres, Managed Better Auth, Object Storage, Functions, AI Gateway
-
-## Run it
-
-1. Install the Neon CLI and sign in:
-
-```bash
-npm i -g neon
-neon login
+```text
+GitHub Pages ── Neon Auth JWT ──> Neon Function
+                                    ├─ Postgres
+                                    ├─ Object Storage
+                                    └─ AI Gateway
 ```
 
-2. Install app dependencies:
+The browser bundle contains only public Auth and Function URLs. Database,
+Storage, and AI credentials remain inside Neon.
+
+## Local development
 
 ```bash
 npm install
+cp .env.example .env.local
 ```
 
-3. Link a project in a region that has Functions / Storage / AI Gateway (`aws-us-east-2` is a safe default):
+Set:
+
+```dotenv
+VITE_NEON_AUTH_URL=https://your-branch.neonauth.../neondb/auth
+VITE_NEON_FUNCTION_API_URL=https://your-branch-api.compute...
+NEON_AI_MODEL=llama-4-maverick
+```
+
+Trust the Vite origin in Neon Auth:
 
 ```bash
-neon link --project-name bird-id --region-id aws-us-east-2
+npx neon@latest neon-auth domain add http://127.0.0.1:5173 \
+  --project-id holy-poetry-88306888 \
+  --branch br-damp-morning-b5l3fkly
 ```
 
-4. Put a cookie secret and an invoke secret in `.env.local` (Neon will add the rest on deploy):
+Then run:
 
 ```bash
-openssl rand -base64 32
+npm run dev -- --host 127.0.0.1
 ```
+
+## Neon backend
+
+`neon.ts` declares Managed Auth, the private `birds` bucket, AI Gateway, and
+the `api` Function. Link a supported-region project, then:
 
 ```bash
-NEON_AUTH_COOKIE_SECRET=
-FUNCTION_INVOKE_SECRET=
-NEON_AI_MODEL=gpt-5-mini
+npx neon@latest deploy --env .env.local
 ```
 
-5. Deploy the backend and pull URLs/credentials:
+The Function verifies browser JWTs against `NEON_AUTH_JWKS_URL` and derives
+ownership from the JWT `sub`. It does not trust a browser-supplied user id.
+
+## GitHub Pages
+
+1. Push `feat/github-pages-neon` to a GitHub repository.
+2. In **Settings → Pages**, choose **GitHub Actions** as the source.
+3. In **Settings → Secrets and variables → Actions → Variables**, create:
+   - `VITE_NEON_AUTH_URL`
+   - `VITE_NEON_FUNCTION_API_URL`
+4. Push the branch or run the **Deploy Fieldmark to GitHub Pages** workflow.
+5. Add the Pages origin to Neon Auth:
 
 ```bash
-export FUNCTION_INVOKE_SECRET="the same value as in .env.local"
-neon deploy
+OWNER=$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+)/.*#\1#')
+npx neon@latest neon-auth domain add "https://${OWNER}.github.io" \
+  --project-id holy-poetry-88306888 \
+  --branch br-damp-morning-b5l3fkly
 ```
 
-Confirm `.env` / `.env.local` now includes `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_JWKS_URL`, `NEON_FUNCTION_API_BASE_URL`, AI Gateway, and AWS storage vars. Copy `FUNCTION_INVOKE_SECRET` into `.env.local` if deploy wrote a different env file.
+GitHub project Pages uses `https://OWNER.github.io/REPOSITORY/`; Auth trusts
+the origin (`https://OWNER.github.io`) while Vite handles the repository base
+path.
 
-6. Run the UI and (optionally) functions locally:
-
-```bash
-npm run neon:dev   # functions on localhost
-npm run dev        # Next.js on localhost:3000
-```
-
-If `neon dev` prints a local function URL, set `NEON_FUNCTION_API_BASE_URL` to that URL while you iterate.
-
-## Tests
+## Verification
 
 ```bash
 npm test
+npm run lint
+npm run build
 ```
 
-These cover photo validation, model JSON parsing, and the Next.js → Function auth header contract. They do not call Neon.
+`dist/` is the complete static site deployed by GitHub Actions.

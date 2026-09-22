@@ -236,7 +236,7 @@ Verify no shared-secret request succeeds and a valid JWT path remains covered.
 - [ ] **Step 2: Deploy the Function**
 
 Run: `npx neon@latest deploy --env .env.local`
-Expected: function updated on `br-little-cloud-b5cc6h3k`.
+Expected: function updated on the isolated `github-pages-neon` branch.
 
 - [ ] **Step 3: Add the final Pages origin**
 
@@ -246,7 +246,7 @@ Run:
 OWNER=$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+)/.*#\1#')
 npx neon@latest neon-auth domain add "https://${OWNER}.github.io" \
   --project-id holy-poetry-88306888 \
-  --branch br-little-cloud-b5cc6h3k
+  --branch br-damp-morning-b5l3fkly
 ```
 
 - [ ] **Step 4: End-to-end browser verification**

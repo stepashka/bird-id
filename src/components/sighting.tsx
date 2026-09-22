@@ -1,18 +1,4 @@
-export type Sighting = {
-  id: string;
-  commonName: string;
-  scientificName: string;
-  confidence: number;
-  createdAt: string;
-  photoUrl: string;
-};
-
-export function confidenceLabel(confidence: number) {
-  if (confidence >= 0.8) return "strong match";
-  if (confidence >= 0.55) return "likely";
-  if (confidence >= 0.3) return "possible";
-  return "uncertain";
-}
+import { confidenceLabel, type Sighting } from "@/lib/sighting";
 
 export function SightingResult({
   sighting,
@@ -29,7 +15,6 @@ export function SightingResult({
   if (layout === "row") {
     return (
       <article className="grid grid-cols-[7.5rem_1fr] gap-5 border-t border-ink/15 py-6 first:border-t-0 first:pt-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={sighting.photoUrl}
           alt={sighting.commonName}
@@ -50,7 +35,6 @@ export function SightingResult({
 
   return (
     <article className="mt-10 grid gap-6 md:grid-cols-[minmax(0,18rem)_1fr] md:items-end">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={sighting.photoUrl}
         alt={sighting.commonName}

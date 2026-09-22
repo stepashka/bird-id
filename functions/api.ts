@@ -50,10 +50,7 @@ function ensureSchema() {
 async function userIdFromRequest(c: { req: { header: (name: string) => string | undefined } }) {
   return resolveUserId({
     authorization: c.req.header("authorization"),
-    invokeSecretHeader: c.req.header("x-invoke-secret"),
-    userIdHeader: c.req.header("x-user-id"),
     jwksUrl: process.env.NEON_AUTH_JWKS_URL,
-    invokeSecret: process.env.FUNCTION_INVOKE_SECRET,
   });
 }
 
@@ -105,7 +102,7 @@ app.use(
   "*",
   cors({
     origin: "*",
-    allowHeaders: ["Authorization", "Content-Type", "X-User-Id"],
+    allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["GET", "POST", "OPTIONS"],
   }),
 );

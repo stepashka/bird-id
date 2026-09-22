@@ -9,6 +9,10 @@ describe("readShareToken", () => {
   it("returns null when the query string has no share token", () => {
     expect(readShareToken("?other=abc")).toBeNull();
   });
+
+  it("returns null when the share parameter is empty", () => {
+    expect(readShareToken("?share=")).toBeNull();
+  });
 });
 
 describe("buildShareUrl", () => {
@@ -64,6 +68,35 @@ describe("shareLink", () => {
       shareLink({ url: "https://example/share", share, writeText }),
     ).resolves.toBe("cancelled");
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("treats any AbortError-named rejection as cancellation", async () => {
+    const share = vi.fn().mockRejectedValue({ name: "AbortError" });
+    const writeText = vi.fn();
+
+    await expect(
+      shareLink({ url: "https://example/share", share, writeText }),
+    ).resolves.toBe("cancelled");
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("copies when native sharing fails for a non-cancellation reason", async () => {
+    const share = vi.fn().mockRejectedValue(new Error("Share unavailable"));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      shareLink({ url: "https://example/share", share, writeText }),
+    ).resolves.toBe("copied");
+    expect(writeText).toHaveBeenCalledWith("https://example/share");
+  });
+
+  it("returns manual when native sharing and clipboard both fail", async () => {
+    const share = vi.fn().mockRejectedValue(new Error("Share unavailable"));
+    const writeText = vi.fn().mockRejectedValue(new Error("Not allowed"));
+
+    await expect(
+      shareLink({ url: "https://example/share", share, writeText }),
+    ).resolves.toBe("manual");
   });
 
   it("returns manual when clipboard writing fails", async () => {

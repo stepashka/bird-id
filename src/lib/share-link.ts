@@ -17,8 +17,17 @@ type ShareLinkOptions = {
   writeText?: (text: string) => Promise<void>;
 };
 
+function isAbortError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "name" in error &&
+      error.name === "AbortError",
+  );
+}
+
 export function readShareToken(search: string): string | null {
-  return new URLSearchParams(search).get("share");
+  return new URLSearchParams(search).get("share") || null;
 }
 
 export function buildShareUrl(location: ShareLocation, token: string): string {
@@ -39,10 +48,9 @@ export async function shareLink({
       await share({ title, text, url });
       return "shared";
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      if (isAbortError(error)) {
         return "cancelled";
       }
-      return "manual";
     }
   }
 

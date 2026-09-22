@@ -10,6 +10,7 @@ export type Sighting = {
   alternatives?: string[];
   evidence?: string[];
   names?: LocalizedNames;
+  shared?: boolean;
 };
 
 export function confidenceLabel(confidence: number) {

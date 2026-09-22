@@ -4,6 +4,21 @@ export type BirdApiOptions = {
   fetcher?: typeof fetch;
 };
 
+export type PublicBirdApiOptions = {
+  baseUrl: string;
+  fetcher?: typeof fetch;
+};
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  const body = (await response.json()) as T & { error?: string };
+
+  if (!response.ok) {
+    throw new Error(body.error ?? "The bird service could not complete the request.");
+  }
+
+  return body;
+}
+
 export function createBirdApi({
   baseUrl,
   getToken,
@@ -26,13 +41,28 @@ export function createBirdApi({
         method: init.method ?? "GET",
         headers,
       });
-      const body = (await response.json()) as T & { error?: string };
+      return parseResponse<T>(response);
+    },
+  };
+}
 
-      if (!response.ok) {
-        throw new Error(body.error ?? "The bird service could not complete the request.");
-      }
+export function createPublicBirdApi({
+  baseUrl,
+  fetcher = fetch,
+}: PublicBirdApiOptions) {
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
 
-      return body;
+  return {
+    async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+      const headers = new Headers(init.headers);
+      headers.delete("Authorization");
+
+      const response = await fetcher(`${normalizedBaseUrl}${path}`, {
+        ...init,
+        method: init.method ?? "GET",
+        headers,
+      });
+      return parseResponse<T>(response);
     },
   };
 }

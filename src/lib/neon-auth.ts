@@ -3,7 +3,7 @@ import {
   BetterAuthReactAdapter,
   type BetterAuthReactAdapterInstance,
 } from "@neondatabase/auth/react/adapters";
-import { createBirdApi } from "./browser-api";
+import { createBirdApi, createPublicBirdApi } from "./browser-api";
 import { readPublicConfig } from "./public-config";
 
 const config = readPublicConfig(import.meta.env);
@@ -18,4 +18,7 @@ export const authClient = neonAuth.adapter;
 export const birdApi = createBirdApi({
   baseUrl: config.functionUrl,
   getToken: neonAuth.getJWTToken,
+});
+export const publicBirdApi = createPublicBirdApi({
+  baseUrl: config.functionUrl,
 });

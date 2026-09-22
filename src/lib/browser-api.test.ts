@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBirdApi } from "./browser-api";
+import { createBirdApi, createPublicBirdApi } from "./browser-api";
 
 describe("createBirdApi", () => {
   it("adds the session JWT to Function requests", async () => {
@@ -46,6 +46,62 @@ describe("createBirdApi", () => {
 
     await expect(api.request("/identify", { method: "POST" })).rejects.toThrow(
       "Use a JPEG, PNG, or WebP photo.",
+    );
+  });
+});
+
+describe("createPublicBirdApi", () => {
+  it("allows a public request without a JWT or Authorization header", async () => {
+    const fetcher = vi.fn(
+      async (_input: string | URL | Request, init?: RequestInit) =>
+        Response.json({
+          authorization: new Headers(init?.headers).get("Authorization"),
+          id: "bird-1",
+        }),
+    );
+    const api = createPublicBirdApi({
+      baseUrl: "https://function.example/",
+      fetcher,
+    });
+
+    await expect(api.request("/shares/token")).resolves.toEqual({
+      authorization: null,
+      id: "bird-1",
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://function.example/shares/token",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("never forwards an Authorization header", async () => {
+    const fetcher = vi.fn(
+      async (_input: string | URL | Request, init?: RequestInit) =>
+        Response.json({
+          authorization: new Headers(init?.headers).get("Authorization"),
+        }),
+    );
+    const api = createPublicBirdApi({
+      baseUrl: "https://function.example",
+      fetcher,
+    });
+
+    await expect(
+      api.request("/shares/token", {
+        headers: { Authorization: "Bearer secret" },
+      }),
+    ).resolves.toEqual({ authorization: null });
+  });
+
+  it("surfaces the Function error message", async () => {
+    const api = createPublicBirdApi({
+      baseUrl: "https://function.example",
+      fetcher: async () =>
+        Response.json({ error: "This share link is invalid." }, { status: 404 }),
+    });
+
+    await expect(api.request("/shares/token")).rejects.toThrow(
+      "This share link is invalid.",
     );
   });
 });

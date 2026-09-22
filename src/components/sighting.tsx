@@ -1,4 +1,5 @@
 import { confidenceLabel, type Sighting } from "@/lib/sighting";
+import { wikipediaUrl } from "@/lib/wikipedia";
 
 export function SightingResult({
   sighting,
@@ -29,6 +30,7 @@ export function SightingResult({
             {confidenceLabel(sighting.confidence)} · {date}
           </p>
           <SightingNotes sighting={sighting} />
+          <WikipediaLink sighting={sighting} />
         </div>
       </article>
     );
@@ -50,8 +52,22 @@ export function SightingResult({
           {confidenceLabel(sighting.confidence)} · {date}
         </p>
         <SightingNotes sighting={sighting} />
+        <WikipediaLink sighting={sighting} />
       </div>
     </article>
+  );
+}
+
+function WikipediaLink({ sighting }: { sighting: Sighting }) {
+  return (
+    <a
+      className="mt-3 inline-block text-moss underline underline-offset-4"
+      href={wikipediaUrl(sighting.scientificName, navigator.language)}
+      target="_blank"
+      rel="noreferrer"
+    >
+      View on Wikipedia
+    </a>
   );
 }
 

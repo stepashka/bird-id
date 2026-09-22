@@ -1,0 +1,12 @@
+const SUPPORTED_LANGUAGES = new Set(["en", "nl", "ru", "es", "ja"]);
+
+export function wikipediaUrl(scientificName: string, browserLanguage: string) {
+  const requestedLanguage = browserLanguage.split("-")[0]?.toLowerCase();
+  const language =
+    requestedLanguage && SUPPORTED_LANGUAGES.has(requestedLanguage)
+      ? requestedLanguage
+      : "en";
+  const url = new URL(`https://${language}.wikipedia.org/wiki/Special:Search`);
+  url.searchParams.set("search", scientificName);
+  return url.toString();
+}

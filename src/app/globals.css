@@ -1,0 +1,64 @@
+@import "tailwindcss";
+@import "@neondatabase/auth-ui/tailwind";
+
+:root {
+  --fog: #dfe6dc;
+  --paper: #f3f6ef;
+  --ink: #1b2a22;
+  --moss: #245c42;
+  --lichen: #6f8a78;
+  --warbler: #d7a21a;
+  --dusk: #31444f;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --color-fog: var(--fog);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-moss: var(--moss);
+  --color-lichen: var(--lichen);
+  --color-warbler: var(--warbler);
+  --color-dusk: var(--dusk);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 420px at 8% -10%, #cdd8c6 0%, transparent 55%),
+    var(--fog);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

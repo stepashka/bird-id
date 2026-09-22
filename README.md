@@ -57,7 +57,7 @@ ownership from the JWT `sub`. It does not trust a browser-supplied user id.
 
 ## GitHub Pages
 
-1. Push `feat/github-pages-neon` to a GitHub repository.
+1. Push `main` to a GitHub repository.
 2. In **Settings → Pages**, choose **GitHub Actions** as the source.
 3. In **Settings → Secrets and variables → Actions → Variables**, create:
    - `VITE_NEON_AUTH_URL`

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Keep `main` unchanged at commit `6b02e09`.
+- Preserve the original Next.js app on `archive/next-neon-server`.
 - No secret may be bundled into the static frontend.
 - The Function derives ownership only from a verified JWT `sub`.
 - Preserve the existing Fieldmark visual design and upload/history behavior.

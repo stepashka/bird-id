@@ -72,5 +72,6 @@ domains and the Function CORS allowlist.
 
 ## Rollback
 
-The current Next.js implementation remains unchanged on `main` at commit
-`6b02e09`. The rewrite exists only on `feat/github-pages-neon`.
+The original Next.js implementation remains available on
+`archive/next-neon-server` at commit `b5d4b9b`. The static app is the
+canonical `main` deployment.

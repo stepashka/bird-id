@@ -2,7 +2,7 @@ name: Deploy Fieldmark to GitHub Pages
 
 on:
   push:
-    branches: [feat/github-pages-neon]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

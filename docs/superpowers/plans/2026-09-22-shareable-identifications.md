@@ -598,7 +598,7 @@ NEON_AI_MODEL=gpt-5-4-mini npx neon@latest deploy \
   --no-env-pull
 ```
 
-Expected: only `google-and-id-quality` (`br-bitter-waterfall-b5u6m4d2`) updates.
+Expected: only `dev` (`br-bitter-waterfall-b5u6m4d2`) updates.
 
 - [ ] **Step 3: Restart the local Vite server on a fixed port**
 

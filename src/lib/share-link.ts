@@ -17,6 +17,14 @@ type ShareLinkOptions = {
   writeText?: (text: string) => Promise<void>;
 };
 
+export type ShareOutcome = "shared" | "copied" | "manual" | "cancelled";
+
+export function shareMessage(outcome: ShareOutcome): string | null {
+  if (outcome === "copied") return "Link copied.";
+  if (outcome === "manual") return "Copy this link:";
+  return null;
+}
+
 function isAbortError(error: unknown): boolean {
   return Boolean(
     error &&
@@ -42,7 +50,7 @@ export async function shareLink({
   text,
   share,
   writeText,
-}: ShareLinkOptions): Promise<"shared" | "copied" | "manual" | "cancelled"> {
+}: ShareLinkOptions): Promise<ShareOutcome> {
   if (share) {
     try {
       await share({ title, text, url });

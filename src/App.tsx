@@ -3,9 +3,17 @@ import { AuthPanel } from "@/components/auth-panel";
 import { Header, type AppView } from "@/components/header";
 import { HistoryPanel } from "@/components/history-panel";
 import { IdentifyPanel } from "@/components/identify-panel";
+import { SharedIdentificationPage } from "@/components/shared-identification-page";
 import { authClient } from "@/lib/neon-auth";
+import { readShareToken } from "@/lib/share-link";
 
 export default function App() {
+  const shareToken = readShareToken(window.location.search);
+  if (shareToken) return <SharedIdentificationPage token={shareToken} />;
+  return <AuthenticatedApp />;
+}
+
+function AuthenticatedApp() {
   const [view, setView] = useState<AppView>("identify");
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;

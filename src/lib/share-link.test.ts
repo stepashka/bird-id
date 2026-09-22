@@ -1,5 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildShareUrl, readShareToken, shareLink } from "./share-link";
+import {
+  buildShareUrl,
+  readShareToken,
+  shareLink,
+  shareMessage,
+} from "./share-link";
+
+describe("shareMessage", () => {
+  it("maps share outcomes to owner feedback", () => {
+    expect(shareMessage("shared")).toBeNull();
+    expect(shareMessage("copied")).toBe("Link copied.");
+    expect(shareMessage("manual")).toBe("Copy this link:");
+    expect(shareMessage("cancelled")).toBeNull();
+  });
+});
 
 describe("readShareToken", () => {
   it("reads the share token from the query string", () => {

@@ -35,6 +35,8 @@ describe("parseIdentification", () => {
       commonName: "American Robin",
       scientificName: "Turdus migratorius",
       confidence: 0.86,
+      alternatives: [],
+      evidence: [],
     });
   });
 
@@ -47,6 +49,8 @@ describe("parseIdentification", () => {
       commonName: "Blue Jay",
       scientificName: "Cyanocitta cristata",
       confidence: 0.7,
+      alternatives: [],
+      evidence: [],
     });
   });
 
@@ -54,5 +58,23 @@ describe("parseIdentification", () => {
     expect(() =>
       parseIdentification({ commonName: "", scientificName: "", confidence: 1 }),
     ).toThrow(/did not name/);
+  });
+
+  it("keeps close alternatives and visible evidence", () => {
+    expect(
+      parseIdentification({
+        commonName: "European Goldfinch",
+        scientificName: "Carduelis carduelis",
+        confidence: 0.72,
+        alternatives: ["Eurasian Siskin", "House Sparrow"],
+        evidence: ["red face", "yellow wing bar", "conical bill"],
+      }),
+    ).toEqual({
+      commonName: "European Goldfinch",
+      scientificName: "Carduelis carduelis",
+      confidence: 0.72,
+      alternatives: ["Eurasian Siskin", "House Sparrow"],
+      evidence: ["red face", "yellow wing bar", "conical bill"],
+    });
   });
 });

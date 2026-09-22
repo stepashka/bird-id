@@ -28,6 +28,7 @@ export function SightingResult({
           <p className="mt-3 text-lichen">
             {confidenceLabel(sighting.confidence)} · {date}
           </p>
+          <SightingNotes sighting={sighting} />
         </div>
       </article>
     );
@@ -48,7 +49,23 @@ export function SightingResult({
         <p className="mt-4 text-lichen">
           {confidenceLabel(sighting.confidence)} · {date}
         </p>
+        <SightingNotes sighting={sighting} />
       </div>
     </article>
+  );
+}
+
+function SightingNotes({ sighting }: { sighting: Sighting }) {
+  const evidence = sighting.evidence?.filter(Boolean) ?? [];
+  const alternatives = sighting.alternatives?.filter(Boolean) ?? [];
+  if (evidence.length === 0 && alternatives.length === 0) return null;
+
+  return (
+    <div className="mt-3 max-w-md text-dusk">
+      {evidence.length > 0 ? <p>Seen: {evidence.join(", ")}</p> : null}
+      {alternatives.length > 0 ? (
+        <p className="mt-1">Also possible: {alternatives.join(", ")}</p>
+      ) : null}
+    </div>
   );
 }

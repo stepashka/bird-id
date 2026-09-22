@@ -36,6 +36,8 @@ const birdSchema = z.object({
   commonName: z.string(),
   scientificName: z.string(),
   confidence: z.number(),
+  alternatives: z.array(z.string()).max(3).optional(),
+  evidence: z.array(z.string()).max(3).optional(),
 });
 
 let schemaReady: Promise<void> | null = null;
@@ -55,7 +57,7 @@ async function userIdFromRequest(c: { req: { header: (name: string) => string | 
 }
 
 async function identifyBird(bytes: Uint8Array, contentType: string) {
-  const modelId = process.env.NEON_AI_MODEL || "gpt-5-mini";
+  const modelId = process.env.NEON_AI_MODEL || "gpt-5-4-mini";
   const model = neon(modelId);
   const image = Buffer.from(bytes);
 
@@ -69,7 +71,10 @@ async function identifyBird(bytes: Uint8Array, contentType: string) {
           role: "user",
           content: [
             { type: "image", image, mediaType: contentType },
-            { type: "text", text: "Identify the bird in this photo." },
+            {
+              type: "text",
+              text: "Identify the bird from visible field marks. Return the requested JSON only.",
+            },
           ],
         },
       ],
@@ -86,7 +91,7 @@ async function identifyBird(bytes: Uint8Array, contentType: string) {
             { type: "image", image, mediaType: contentType },
             {
               type: "text",
-              text: "Identify the bird in this photo. Return JSON only.",
+              text: "Identify the bird from visible field marks. Return JSON only.",
             },
           ],
         },

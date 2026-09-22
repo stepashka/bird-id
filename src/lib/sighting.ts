@@ -5,6 +5,8 @@ export type Sighting = {
   confidence: number;
   createdAt: string;
   photoUrl: string;
+  alternatives?: string[];
+  evidence?: string[];
 };
 
 export function confidenceLabel(confidence: number) {

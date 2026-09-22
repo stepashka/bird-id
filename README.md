@@ -26,7 +26,7 @@ Set:
 ```dotenv
 VITE_NEON_AUTH_URL=https://your-branch.neonauth.../neondb/auth
 VITE_NEON_FUNCTION_API_URL=https://your-branch-api.compute...
-NEON_AI_MODEL=llama-4-maverick
+NEON_AI_MODEL=gpt-5-4-mini
 ```
 
 Trust the Vite origin in Neon Auth:

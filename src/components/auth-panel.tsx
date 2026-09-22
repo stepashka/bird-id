@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { googleSignInOptions } from "@/lib/google-auth";
 import { authClient } from "@/lib/neon-auth";
 
 type Mode = "sign-in" | "sign-up";
@@ -36,6 +37,23 @@ export function AuthPanel() {
         caught instanceof Error ? caught.message : "Authentication failed.",
       );
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.social(googleSignInOptions(window.location));
+      if (result.error) {
+        setError(result.error.message ?? "Google sign-in failed.");
+        setBusy(false);
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Google sign-in failed.",
+      );
       setBusy(false);
     }
   }
@@ -101,6 +119,14 @@ export function AuthPanel() {
               : mode === "sign-in"
                 ? "Sign in"
                 : "Create account"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="border border-ink/30 bg-paper px-5 py-2.5 text-ink disabled:opacity-50"
+            onClick={signInWithGoogle}
+          >
+            Continue with Google
           </button>
           <button
             type="button"

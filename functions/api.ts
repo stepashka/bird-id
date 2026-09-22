@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import { Pool } from "pg";
 import { z } from "zod";
 import { AuthError, resolveUserId } from "../lib/auth";
+import { lookupLocalizedNames } from "../lib/bird-names";
 import {
   IDENTIFY_SYSTEM_PROMPT,
   parseIdentification,
@@ -27,6 +28,8 @@ CREATE TABLE IF NOT EXISTS identifications (
 );
 CREATE INDEX IF NOT EXISTS identifications_user_created_idx
   ON identifications (user_id, created_at DESC);
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS common_names jsonb;
 `;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -132,6 +135,10 @@ app.post("/identify", async (c) => {
     }
 
     const identification = await identifyBird(bytes, contentType);
+    const names = await lookupLocalizedNames(
+      identification.commonName,
+      identification.scientificName,
+    ).catch(() => ({}));
     const objectKey = objectKeyForUser(userId, contentType);
     await uploadPhoto(objectKey, Buffer.from(bytes), contentType);
 
@@ -140,8 +147,8 @@ app.post("/identify", async (c) => {
       created_at: Date;
     }>(
       `insert into identifications
-        (user_id, object_key, content_type, common_name, scientific_name, confidence)
-       values ($1, $2, $3, $4, $5, $6)
+        (user_id, object_key, content_type, common_name, scientific_name, confidence, common_names)
+       values ($1, $2, $3, $4, $5, $6, $7)
        returning id, created_at`,
       [
         userId,
@@ -150,6 +157,7 @@ app.post("/identify", async (c) => {
         identification.commonName,
         identification.scientificName,
         identification.confidence,
+        JSON.stringify(names),
       ],
     );
 
@@ -159,6 +167,7 @@ app.post("/identify", async (c) => {
       id: row.id,
       createdAt: row.created_at,
       photoUrl,
+      names,
       ...identification,
     });
   } catch (error) {
@@ -181,8 +190,9 @@ app.get("/history", async (c) => {
       scientific_name: string;
       confidence: number;
       created_at: Date;
+      common_names: unknown;
     }>(
-      `select id, object_key, common_name, scientific_name, confidence, created_at
+      `select id, object_key, common_name, scientific_name, confidence, created_at, common_names
        from identifications
        where user_id = $1
        order by created_at desc
@@ -198,6 +208,7 @@ app.get("/history", async (c) => {
         confidence: row.confidence,
         createdAt: row.created_at,
         photoUrl: await signedPhotoUrl(row.object_key),
+        names: row.common_names ?? {},
       })),
     );
 

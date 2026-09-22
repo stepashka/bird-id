@@ -1,3 +1,4 @@
+import { formatLocalizedNames } from "../../lib/bird-names";
 import { confidenceLabel, type Sighting } from "@/lib/sighting";
 import { wikipediaUrl } from "@/lib/wikipedia";
 
@@ -26,6 +27,7 @@ export function SightingResult({
             {sighting.commonName}
           </h2>
           <p className="mt-1 italic text-dusk">{sighting.scientificName}</p>
+          <LocalizedNameList names={sighting.names} />
           <p className="mt-3 text-lichen">
             {confidenceLabel(sighting.confidence)} · {date}
           </p>
@@ -48,6 +50,7 @@ export function SightingResult({
           {sighting.commonName}
         </h2>
         <p className="mt-2 text-xl italic text-dusk">{sighting.scientificName}</p>
+        <LocalizedNameList names={sighting.names} />
         <p className="mt-4 text-lichen">
           {confidenceLabel(sighting.confidence)} · {date}
         </p>
@@ -55,6 +58,18 @@ export function SightingResult({
         <WikipediaLink sighting={sighting} />
       </div>
     </article>
+  );
+}
+
+function LocalizedNameList({ names }: { names: Sighting["names"] }) {
+  const lines = formatLocalizedNames(names);
+  if (lines.length === 0) return null;
+  return (
+    <ul className="mt-3 max-w-md text-dusk">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
   );
 }
 

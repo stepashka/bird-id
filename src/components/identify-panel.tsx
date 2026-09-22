@@ -45,6 +45,7 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
         photoUrl: payload.photoUrl,
         alternatives: payload.alternatives,
         evidence: payload.evidence,
+        names: payload.names,
       });
     } catch (caught) {
       setError(

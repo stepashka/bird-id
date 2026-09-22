@@ -1,3 +1,5 @@
+import type { LocalizedNames } from "../../lib/bird-names";
+
 export type Sighting = {
   id: string;
   commonName: string;
@@ -7,6 +9,7 @@ export type Sighting = {
   photoUrl: string;
   alternatives?: string[];
   evidence?: string[];
+  names?: LocalizedNames;
 };
 
 export function confidenceLabel(confidence: number) {

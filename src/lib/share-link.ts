@@ -5,14 +5,12 @@ type ShareLocation = {
 
 type ShareData = {
   title?: string;
-  text?: string;
   url?: string;
 };
 
 type ShareLinkOptions = {
   url: string;
   title?: string;
-  text?: string;
   share?: (data: ShareData) => Promise<void>;
   writeText?: (text: string) => Promise<void>;
 };
@@ -47,13 +45,14 @@ export function buildShareUrl(location: ShareLocation, token: string): string {
 export async function shareLink({
   url,
   title,
-  text,
   share,
   writeText,
 }: ShareLinkOptions): Promise<ShareOutcome> {
   if (share) {
     try {
-      await share({ title, text, url });
+      const data: ShareData = { url };
+      if (title) data.title = title;
+      await share(data);
       return "shared";
     } catch (error) {
       if (isAbortError(error)) {

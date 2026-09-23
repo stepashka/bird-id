@@ -34,7 +34,6 @@ export function ShareControls({
       const nextOutcome = await shareLink({
         url: nextUrl,
         title: sighting.commonName,
-        text: `A bird identification from Fieldmark: ${sighting.commonName}`,
         share: navigator.share?.bind(navigator),
         writeText: navigator.clipboard?.writeText.bind(navigator.clipboard),
       });

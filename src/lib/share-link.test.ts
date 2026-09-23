@@ -63,6 +63,27 @@ describe("shareLink", () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 
+  it("omits descriptive text from the native share payload", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi.fn();
+    const options = {
+      url: "http://127.0.0.1:5173/?share=token43charsxxxxxxxxxxxxxxxxxxxxxxx",
+      title: "Rose-ringed Parakeet",
+      text: "A bird identification from Fieldmark: Rose-ringed Parakeet",
+      share,
+      writeText,
+    };
+
+    await expect(shareLink(options)).resolves.toBe("shared");
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(share.mock.calls[0]?.[0]).toEqual({
+      title: "Rose-ringed Parakeet",
+      url: "http://127.0.0.1:5173/?share=token43charsxxxxxxxxxxxxxxxxxxxxxxx",
+    });
+    expect(share.mock.calls[0]?.[0]).not.toHaveProperty("text");
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it("copies when native sharing is unavailable", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

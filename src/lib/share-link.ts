@@ -23,6 +23,10 @@ export function shareMessage(outcome: ShareOutcome): string | null {
   return null;
 }
 
+export function ownerShareUrl(url: string) {
+  return url || null;
+}
+
 function isAbortError(error: unknown): boolean {
   return Boolean(
     error &&

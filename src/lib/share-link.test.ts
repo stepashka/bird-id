@@ -4,6 +4,7 @@ import {
   readShareToken,
   shareLink,
   shareMessage,
+  ownerShareUrl,
 } from "./share-link";
 
 describe("shareMessage", () => {
@@ -12,6 +13,18 @@ describe("shareMessage", () => {
     expect(shareMessage("copied")).toBe("Link copied.");
     expect(shareMessage("manual")).toBe("Copy this link:");
     expect(shareMessage("cancelled")).toBeNull();
+  });
+});
+
+describe("ownerShareUrl", () => {
+  it("keeps a generated share URL visible after share", () => {
+    expect(ownerShareUrl("https://stepashka.github.io/bird-id/?share=abc")).toBe(
+      "https://stepashka.github.io/bird-id/?share=abc",
+    );
+  });
+
+  it("hides the field when no URL was generated this session", () => {
+    expect(ownerShareUrl("")).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { birdApi } from "@/lib/neon-auth";
 import {
   buildShareUrl,
+  ownerShareUrl,
   shareLink,
   shareMessage,
   type ShareOutcome,
@@ -64,6 +65,7 @@ export function ShareControls({
   }
 
   const message = outcome ? shareMessage(outcome) : null;
+  const visibleUrl = ownerShareUrl(url);
 
   return (
     <div className="mt-4">
@@ -80,10 +82,10 @@ export function ShareControls({
             : "Share identification"}
       </button>
       {message ? <p className="mt-2 text-dusk">{message}</p> : null}
-      {outcome === "manual" ? (
+      {visibleUrl ? (
         <input
           className="mt-2 w-full border border-ink/25 bg-paper p-2"
-          value={url}
+          value={visibleUrl}
           readOnly
           aria-label="Share link"
           onFocus={(event) => event.currentTarget.select()}

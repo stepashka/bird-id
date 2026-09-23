@@ -45,7 +45,9 @@ export function AuthPanel() {
     setBusy(true);
     setError(null);
     try {
-      const result = await authClient.signIn.social(googleSignInOptions(window.location));
+      const result = await authClient.signIn.social(
+        googleSignInOptions(window.location, import.meta.env.BASE_URL),
+      );
       if (result.error) {
         setError(result.error.message ?? "Google sign-in failed.");
         setBusy(false);

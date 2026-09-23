@@ -115,3 +115,11 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 - Neon default (not serving Pages): `main` / `br-little-cloud-b5cc6h3k`
 - Local experiment: `google-and-id-quality` / `br-bitter-waterfall-b5u6m4d2` (still has its own TTL — expected for a test branch)
 - Vision model on production Function: `gpt-5-4-mini`
+
+## Google first-login 404 on GitHub origin
+
+First Google sign-in from Pages can land on `https://stepashka.github.io/` (user-site 404). The second attempt returns to `/bird-id/` and works.
+
+Better Auth’s OAuth callback does `isRegister ? newUserURL || callbackURL : callbackURL`. Neon’s default app/site URL is the origin, without the project path. First-time Google users are registrations, so they follow that origin URL. Returning users use the client `callbackURL`.
+
+The client must send `callbackURL`, `newUserCallbackURL`, and `errorCallbackURL` as `origin + Vite base` (`https://stepashka.github.io/bird-id/`), not `location.href` alone and never the origin root.

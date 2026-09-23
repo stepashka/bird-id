@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { SightingResult } from "@/components/sighting";
 import { publicBirdApi } from "@/lib/neon-auth";
-import { sharedPageState } from "@/lib/shared-page";
+import { sharedPageHomeHref, sharedPageState } from "@/lib/shared-page";
 import type { Sighting } from "@/lib/sighting";
 
 export function SharedIdentificationPage({ token }: { token: string }) {
@@ -31,6 +31,14 @@ export function SharedIdentificationPage({ token }: { token: string }) {
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-12">
       <p className="font-display text-2xl">Fieldmark</p>
+      <p className="mt-3">
+        <a
+          href={sharedPageHomeHref(window.location)}
+          className="text-moss underline underline-offset-4"
+        >
+          Identify a bird with Fieldmark →
+        </a>
+      </p>
       {state.kind === "loading" ? (
         <p className="mt-10 text-lichen">Loading identification…</p>
       ) : state.kind === "unavailable" ? (

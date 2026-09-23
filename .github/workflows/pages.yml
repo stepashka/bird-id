@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Local machines use the Databricks npm proxy via user ~/.npmrc.
+      # GitHub Actions cannot reach that proxy — pin public npm here only.
       - uses: actions/setup-node@v4
         with:
           node-version: 22

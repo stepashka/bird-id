@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SightingResult } from "@/components/sighting";
+import { ShareControls } from "@/components/share-controls";
 import { birdApi } from "@/lib/neon-auth";
 import type { Sighting } from "@/lib/sighting";
 
@@ -54,7 +55,23 @@ export function HistoryPanel({ userId }: { userId: string }) {
       ) : (
         <div className="mt-10">
           {items.map((item) => (
-            <SightingResult key={item.id} sighting={item} layout="row" />
+            <SightingResult
+              key={item.id}
+              sighting={item}
+              layout="row"
+              actions={
+                <ShareControls
+                  sighting={item}
+                  onSharedChange={(shared) =>
+                    setItems((current) =>
+                      current.map((entry) =>
+                        entry.id === item.id ? { ...entry, shared } : entry,
+                      ),
+                    )
+                  }
+                />
+              }
+            />
           ))}
         </div>
       )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SightingResult } from "@/components/sighting";
+import { ShareControls } from "@/components/share-controls";
 import { birdApi } from "@/lib/neon-auth";
 import type { Sighting } from "@/lib/sighting";
 
@@ -114,7 +115,21 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
         </p>
       ) : null}
 
-      {sighting ? <SightingResult sighting={sighting} /> : null}
+      {sighting ? (
+        <SightingResult
+          sighting={sighting}
+          actions={
+            <ShareControls
+              sighting={sighting}
+              onSharedChange={(shared) =>
+                setSighting((current) =>
+                  current ? { ...current, shared } : current,
+                )
+              }
+            />
+          }
+        />
+      ) : null}
     </div>
   );
 }

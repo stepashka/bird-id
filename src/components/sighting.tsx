@@ -2,13 +2,18 @@ import { formatLocalizedNames } from "../../lib/bird-names";
 import { googleImagesUrl } from "@/lib/google-images";
 import { confidenceLabel, type Sighting } from "@/lib/sighting";
 import { wikipediaUrl } from "@/lib/wikipedia";
+import type { ReactNode } from "react";
 
 export function SightingResult({
   sighting,
   layout = "hero",
+  actions,
+  publicView = false,
 }: {
   sighting: Sighting;
   layout?: "hero" | "row";
+  actions?: ReactNode;
+  publicView?: boolean;
 }) {
   const date = new Date(sighting.createdAt).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -21,6 +26,7 @@ export function SightingResult({
         <img
           src={sighting.photoUrl}
           alt={sighting.commonName}
+          referrerPolicy={publicView ? "no-referrer" : undefined}
           className="h-24 w-[7.5rem] object-cover"
         />
         <div>
@@ -33,7 +39,8 @@ export function SightingResult({
             {confidenceLabel(sighting.confidence)} · {date}
           </p>
           <SightingNotes sighting={sighting} />
-          <SightingLinks sighting={sighting} />
+          <SightingLinks sighting={sighting} publicView={publicView} />
+          {actions}
         </div>
       </article>
     );
@@ -44,6 +51,7 @@ export function SightingResult({
       <img
         src={sighting.photoUrl}
         alt={sighting.commonName}
+        referrerPolicy={publicView ? "no-referrer" : undefined}
         className="w-full object-cover"
       />
       <div>
@@ -56,7 +64,8 @@ export function SightingResult({
           {confidenceLabel(sighting.confidence)} · {date}
         </p>
         <SightingNotes sighting={sighting} />
-        <SightingLinks sighting={sighting} />
+        <SightingLinks sighting={sighting} publicView={publicView} />
+        {actions}
       </div>
     </article>
   );
@@ -74,7 +83,13 @@ function LocalizedNameList({ names }: { names: Sighting["names"] }) {
   );
 }
 
-function SightingLinks({ sighting }: { sighting: Sighting }) {
+function SightingLinks({
+  sighting,
+  publicView,
+}: {
+  sighting: Sighting;
+  publicView: boolean;
+}) {
   const imagesUrl = googleImagesUrl(sighting.names?.en ?? sighting.commonName);
 
   return (
@@ -84,6 +99,7 @@ function SightingLinks({ sighting }: { sighting: Sighting }) {
         href={wikipediaUrl(sighting.scientificName, navigator.language)}
         target="_blank"
         rel="noreferrer"
+        referrerPolicy={publicView ? "no-referrer" : undefined}
       >
         View on Wikipedia
       </a>
@@ -93,6 +109,7 @@ function SightingLinks({ sighting }: { sighting: Sighting }) {
           href={imagesUrl}
           target="_blank"
           rel="noreferrer"
+          referrerPolicy={publicView ? "no-referrer" : undefined}
         >
           Google Images
         </a>

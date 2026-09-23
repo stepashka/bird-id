@@ -13,7 +13,9 @@ import {
   parseIdentificationJson,
 } from "../lib/identification";
 import { objectKeyForUser, validateImageUpload } from "../lib/image";
+import type { SharedIdentificationRow } from "../lib/sharing";
 import { signedPhotoUrl, uploadPhoto } from "../lib/storage";
+import { createShareRoutes } from "./share-routes";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS identifications (
@@ -30,6 +32,18 @@ CREATE INDEX IF NOT EXISTS identifications_user_created_idx
   ON identifications (user_id, created_at DESC);
 ALTER TABLE identifications
   ADD COLUMN IF NOT EXISTS common_names jsonb;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS alternatives jsonb;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS evidence jsonb;
+CREATE TABLE IF NOT EXISTS identification_shares (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  identification_id uuid NOT NULL REFERENCES identifications(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS identification_shares_identification_idx
+  ON identification_shares (identification_id);
 `;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -111,11 +125,75 @@ app.use(
   cors({
     origin: "*",
     allowHeaders: ["Authorization", "Content-Type"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
   }),
 );
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+app.route(
+  "/",
+  createShareRoutes({
+    resolveUserId: async (authorization) =>
+      resolveUserId({
+        authorization,
+        jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+      }),
+    createShare: async (input) => {
+      await ensureSchema();
+      const inserted = await pool.query(
+        `INSERT INTO identification_shares (identification_id, token_hash)
+SELECT id, $3
+FROM identifications
+WHERE id = $1 AND user_id = $2
+RETURNING id;`,
+        [input.identificationId, input.userId, input.tokenHash],
+      );
+      return (inserted.rowCount ?? 0) > 0;
+    },
+    revokeShares: async (input) => {
+      await ensureSchema();
+      const owned = await pool.query(
+        `SELECT id FROM identifications WHERE id = $1 AND user_id = $2`,
+        [input.identificationId, input.userId],
+      );
+      if ((owned.rowCount ?? 0) === 0) {
+        return false;
+      }
+      await pool.query(
+        `DELETE FROM identification_shares shares
+USING identifications identification
+WHERE shares.identification_id = identification.id
+  AND identification.id = $1
+  AND identification.user_id = $2;`,
+        [input.identificationId, input.userId],
+      );
+      return true;
+    },
+    findShared: async (tokenHash) => {
+      await ensureSchema();
+      const { rows } = await pool.query<SharedIdentificationRow>(
+        `SELECT identifications.id,
+                identifications.user_id,
+                identifications.object_key,
+                identifications.common_name,
+                identifications.scientific_name,
+                identifications.confidence,
+                identifications.created_at,
+                identifications.common_names,
+                identifications.alternatives,
+                identifications.evidence
+         FROM identification_shares
+         JOIN identifications
+           ON identifications.id = identification_shares.identification_id
+         WHERE identification_shares.token_hash = $1`,
+        [tokenHash],
+      );
+      return rows[0] ?? null;
+    },
+    signedPhotoUrl,
+  }),
+);
 
 app.post("/identify", async (c) => {
   try {
@@ -147,8 +225,8 @@ app.post("/identify", async (c) => {
       created_at: Date;
     }>(
       `insert into identifications
-        (user_id, object_key, content_type, common_name, scientific_name, confidence, common_names)
-       values ($1, $2, $3, $4, $5, $6, $7)
+        (user_id, object_key, content_type, common_name, scientific_name, confidence, common_names, alternatives, evidence)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        returning id, created_at`,
       [
         userId,
@@ -158,6 +236,8 @@ app.post("/identify", async (c) => {
         identification.scientificName,
         identification.confidence,
         JSON.stringify(names),
+        JSON.stringify(identification.alternatives ?? []),
+        JSON.stringify(identification.evidence ?? []),
       ],
     );
 
@@ -168,6 +248,7 @@ app.post("/identify", async (c) => {
       createdAt: row.created_at,
       photoUrl,
       names,
+      shared: false,
       ...identification,
     });
   } catch (error) {
@@ -191,8 +272,16 @@ app.get("/history", async (c) => {
       confidence: number;
       created_at: Date;
       common_names: unknown;
+      alternatives: string[] | null;
+      evidence: string[] | null;
+      shared: boolean;
     }>(
-      `select id, object_key, common_name, scientific_name, confidence, created_at, common_names
+      `select id, object_key, common_name, scientific_name, confidence, created_at, common_names,
+              alternatives, evidence,
+              EXISTS (
+                SELECT 1 FROM identification_shares shares
+                WHERE shares.identification_id = identifications.id
+              ) AS shared
        from identifications
        where user_id = $1
        order by created_at desc
@@ -209,6 +298,9 @@ app.get("/history", async (c) => {
         createdAt: row.created_at,
         photoUrl: await signedPhotoUrl(row.object_key),
         names: row.common_names ?? {},
+        alternatives: row.alternatives ?? [],
+        evidence: row.evidence ?? [],
+        shared: row.shared,
       })),
     );
 

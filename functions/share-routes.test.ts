@@ -26,6 +26,7 @@ function fakeDependencies(
     revokeSharesResult?: boolean;
     sharedRow?: SharedIdentificationRow | null;
     publicAppUrl?: string;
+    publicShareUrl?: string;
   } = {},
 ): ShareRouteDependencies {
   return {
@@ -37,6 +38,7 @@ function fakeDependencies(
     signedPhotoUrl: async () => "https://signed.example/photo",
     publicAppUrl:
       options.publicAppUrl ?? "https://stepashka.github.io/bird-id/",
+    publicShareUrl: options.publicShareUrl,
     getPreviewPhoto: async () => ({
       body: new Uint8Array([255, 216, 255, 217]),
       contentType: "image/jpeg",
@@ -77,6 +79,22 @@ describe("share routes", () => {
       userId: "owner-1",
       tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+  });
+
+  it("returns a custom-domain share URL when configured", async () => {
+    const app = createShareRoutes(
+      fakeDependencies({
+        publicShareUrl: "https://share.bird-id.app/",
+      }),
+    );
+    const response = await app.request("/identifications/bird-1/shares", {
+      method: "POST",
+      headers: { Authorization: "Bearer owner-jwt" },
+    });
+    const body = await response.json();
+    expect(body.url).toMatch(
+      /^https:\/\/share\.bird-id\.app\/s\/[A-Za-z0-9_-]{43}$/,
+    );
   });
 
   it("returns the same 404 for invalid and unknown tokens", async () => {

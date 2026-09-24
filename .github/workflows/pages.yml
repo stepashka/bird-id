@@ -34,7 +34,7 @@ jobs:
         env:
           VITE_NEON_AUTH_URL: ${{ vars.VITE_NEON_AUTH_URL }}
           VITE_NEON_FUNCTION_API_URL: ${{ vars.VITE_NEON_FUNCTION_API_URL }}
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: /
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

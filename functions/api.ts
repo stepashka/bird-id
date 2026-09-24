@@ -335,9 +335,8 @@ app.route(
       return rows[0] ?? null;
     },
     signedPhotoUrl,
-    publicAppUrl:
-      process.env.SHARE_APP_URL ??
-      "https://stepashka.github.io/bird-id/",
+    publicAppUrl: process.env.SHARE_APP_URL ?? "https://bird-id.app/",
+    publicShareUrl: process.env.SHARE_PUBLIC_URL ?? "https://share.bird-id.app/",
     getPreviewPhoto: readSocialPreview,
   }),
 );

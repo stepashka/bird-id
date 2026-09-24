@@ -22,6 +22,7 @@ export type ShareRouteDependencies = {
   findShared(tokenHash: string): Promise<SharedIdentificationRow | null>;
   signedPhotoUrl(objectKey: string): Promise<string>;
   publicAppUrl: string;
+  publicShareUrl?: string;
   getPreviewPhoto(previewKey: string): Promise<{
     body: Uint8Array;
     contentType: string;
@@ -50,7 +51,7 @@ export function createShareRoutes(deps: ShareRouteDependencies) {
       return c.json(
         {
           token,
-          url: new URL(`/s/${token}`, c.req.url).toString(),
+          url: sharePageUrl(deps, token, c.req.url),
         },
         201,
       );
@@ -104,7 +105,7 @@ export function createShareRoutes(deps: ShareRouteDependencies) {
         );
       }
       return c.html(
-        socialShareHtml(row, token, c.req.url, deps.publicAppUrl),
+        socialShareHtml(row, token, shareOrigin(deps, c.req.url), deps.publicAppUrl),
         200,
         socialHeaders(),
       );
@@ -146,18 +147,30 @@ async function findSocialShare(
   return row?.preview_key ? { ...row, preview_key: row.preview_key } : null;
 }
 
+function shareOrigin(deps: ShareRouteDependencies, requestUrl: string) {
+  return deps.publicShareUrl || requestUrl;
+}
+
+function sharePageUrl(
+  deps: ShareRouteDependencies,
+  token: string,
+  requestUrl: string,
+) {
+  return new URL(`/s/${token}`, shareOrigin(deps, requestUrl)).toString();
+}
+
 function socialShareHtml(
   row: SharedIdentificationRow,
   token: string,
-  requestUrl: string,
+  originUrl: string,
   publicAppUrl: string,
 ) {
   const title = escapeHtml(row.common_name);
   const description = escapeHtml(
     `${row.scientific_name} · Identified with Fieldmark`,
   );
-  const pageUrl = new URL(`/s/${token}`, requestUrl).toString();
-  const photoUrl = new URL(`/s/${token}/photo`, requestUrl).toString();
+  const pageUrl = new URL(`/s/${token}`, originUrl).toString();
+  const photoUrl = new URL(`/s/${token}/photo`, originUrl).toString();
   const appUrl = new URL(publicAppUrl);
   appUrl.searchParams.set("share", token);
   const safeAppUrl = escapeHtml(appUrl.toString());

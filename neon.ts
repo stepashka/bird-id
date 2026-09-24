@@ -16,8 +16,9 @@ export default defineConfig({
       env: {
         NEON_AI_MODEL: process.env.NEON_AI_MODEL ?? "gpt-5-4-mini",
         SHARE_APP_URL:
-          process.env.SHARE_APP_URL ??
-          "https://stepashka.github.io/bird-id/",
+          process.env.SHARE_APP_URL ?? "https://bird-id.app/",
+        SHARE_PUBLIC_URL:
+          process.env.SHARE_PUBLIC_URL ?? "https://share.bird-id.app/",
       },
     },
   },

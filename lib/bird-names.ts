@@ -81,7 +81,7 @@ LIMIT 1`.trim();
   const response = await fetcher(url, {
     headers: {
       Accept: "application/sparql-results+json",
-      "User-Agent": "Fieldmark/0.1 (https://stepashka.github.io/bird-id/)",
+      "User-Agent": "Fieldmark/0.1 (https://bird-id.app/)",
     },
   });
   if (!response.ok) return {};

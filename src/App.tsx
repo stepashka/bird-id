@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { Header } from "@/components/header";
+import { SiteFooter } from "@/components/site-footer";
 import { HistoryPanel } from "@/components/history-panel";
 import { IdentifyPanel } from "@/components/identify-panel";
 import { SharedIdentificationPage } from "@/components/shared-identification-page";
@@ -36,11 +37,11 @@ function AuthenticatedApp() {
   }
 
   return (
-    <>
+    <div className="flex min-h-dvh flex-col">
       <Header view={view} onView={chooseView} userEmail={user?.email} />
 
       {view === "feedback" ? (
-        <main className="mx-auto w-full max-w-5xl px-6 pb-20">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-12">
           <h1 className="font-display text-5xl">Feedback</h1>
           <p className="mt-3 max-w-xl text-[1.15rem] leading-relaxed text-dusk">
             Found something confusing, delightful, or broken? Send a short note
@@ -58,7 +59,7 @@ function AuthenticatedApp() {
         user ? (
           <HistoryPanel userId={user.id} />
         ) : (
-          <main className="mx-auto w-full max-w-3xl px-6 pb-20">
+          <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-12">
             <h1 className="font-display text-5xl">Your log</h1>
             {isPending ? (
               <p className="mt-8 text-lichen">Checking your session…</p>
@@ -68,7 +69,7 @@ function AuthenticatedApp() {
           </main>
         )
       ) : (
-        <main className="mx-auto w-full max-w-5xl px-6 pb-20">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-12">
           <p className="max-w-xl text-[1.15rem] leading-relaxed text-dusk">
             Photograph a bird. Fieldmark names the species and files it with the
             rest of your identifications.
@@ -84,6 +85,7 @@ function AuthenticatedApp() {
           )}
         </main>
       )}
-    </>
+      <SiteFooter />
+    </div>
   );
 }

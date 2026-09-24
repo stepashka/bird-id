@@ -54,6 +54,8 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | **Vision model** | Shipping `llama-4-maverick` to the live Function after it failed the two known photos, then waiting for you to say IDs were still bad. Benchmark on the mis-IDs **before** the first Pages backend deploy. |
 | **Process tax after you already said go** | Extra design gates, dual GitHub-account investigation (that one you asked for), then still fumbling production vs experiment Function env. |
 | **Google first-login return URL** | First Google signup from Pages landed on `https://stepashka.github.io/` (user-site 404); the second attempt worked. Better Auth uses `newUserURL` for registrations. Send `newUserCallbackURL` as origin + Vite base (`/bird-id/`), not the origin root. |
+| **Custom-domain auth migration** | DNS and TLS were validated, but production Neon Auth still trusted only the old Pages origin. The first Google click on `bird-id.app` failed with `403 INVALID_CALLBACKURL`. Adding every new app origin to the branch-scoped Auth domain allowlist and probing `/sign-in/social` must be part of the cutover, before declaring the domain live. |
+| **Cornell donate link** | The Merlin/Cornell donation link was requested, then dropped while the custom-domain work took over. Follow-ups that are not started immediately should stay on the open list until they ship. |
 
 ## What you had to do outside the agent
 
@@ -77,6 +79,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 7. **Corporate npm vs public registry.** Local installs **must** use `~/.npmrc` `registry=https://npm-proxy.cloud.databricks.com/`. GitHub Actions cannot. The agent twice ran `npm ci --registry=https://registry.npmjs.org` (and stripped HTTP_PROXY) on this laptop — that is the wrong direction. Keep the lockfile’s `resolved` URLs on public npm; CI overrides with `actions/setup-node` `registry-url: https://registry.npmjs.org`. Never commit a repo `.npmrc` that points at Databricks (breaks GH) or at public npm (breaks local). Do not pass `--registry` locally.
 8. **Native share `text` concatenated onto the token.** Some OS copy actions join description + URL. Payloads are URL + optional title only.
 9. **First-time Google OAuth 404s at origin** if `newUserCallbackURL` is missing; returning users already used `callbackURL`.
+10. **Custom domains have three independent readiness gates:** DNS, TLS/Pages HTTPS, and the production branch's Neon Auth trusted-domain list. Passing the first two does not make OAuth ready. GitHub certificate issuance and the “Enforce HTTPS” control can also lag behind correct DNS.
 
 ## Timeline (compressed)
 
@@ -111,11 +114,12 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 - After switching git branches, **kill port 5173 and start with `--strictPort`**. Tell the human which Function URL `.env.local` uses.
 - Local `npm ci` / `npm install`: Databricks proxy from user `~/.npmrc`. GitHub Actions: public `registry.npmjs.org` only. Never `--registry=https://registry.npmjs.org` on this machine.
 - Git cleanup after release: delete **merged** feature branches only. Neon cleanup: never `br-damp-morning-b5l3fkly`, never its parent `br-little-cloud-b5cc6h3k`, never durable `dev` `br-bitter-waterfall-b5u6m4d2`.
-- Google OAuth from Pages: always set `callbackURL`, `newUserCallbackURL`, and `errorCallbackURL` to `https://stepashka.github.io/bird-id/`. Native share payloads: URL (and optional title) only — never descriptive `text`.
+- Google OAuth: always set `callbackURL`, `newUserCallbackURL`, and `errorCallbackURL` to the current app URL (`https://bird-id.app/`). Keep `https://stepashka.github.io` trusted only during the redirect transition. Native share payloads: URL (and optional title) only — never descriptive `text`.
+- Origin cutovers: add the new origin to production Neon Auth first, then require DNS/TLS checks **and** an end-to-end `/sign-in/social` probe returning 200. Keep the old trusted origin during a redirect transition.
 
 ## Current production pointers
 
-- Site: https://stepashka.github.io/bird-id/
+- Site: https://bird-id.app/ (the old Pages URL redirects here)
 - Neon project: `holy-poetry-88306888`
 - Pages data branch: **`production`** / `br-damp-morning-b5l3fkly` — **protected, no expiry**
 - Neon default (not serving Pages): `main` / `br-little-cloud-b5cc6h3k`
@@ -190,3 +194,19 @@ First Google sign-in from Pages can land on `https://stepashka.github.io/` (user
 Better Auth’s OAuth callback does `isRegister ? newUserURL || callbackURL : callbackURL`. Neon’s default app/site URL is the origin, without the project path. First-time Google users are registrations, so they follow that origin URL. Returning users use the client `callbackURL`.
 
 The client must send `callbackURL`, `newUserCallbackURL`, and `errorCallbackURL` as `origin + Vite base` (`https://stepashka.github.io/bird-id/`), not `location.href` alone and never the origin root.
+
+## Custom-domain OAuth 403
+
+After `bird-id.app` DNS and GitHub Pages TLS were working, Google sign-in failed
+before reaching Google. A direct request to production Neon Auth from the new
+origin returned:
+
+```json
+{"error":"Invalid callbackURL","code":"INVALID_CALLBACKURL"}
+```
+
+The equivalent request using `https://stepashka.github.io/bird-id/` returned
+200. CORS already accepted `https://bird-id.app`; the missing piece was Neon's
+separate, branch-scoped callback/trusted-domain allowlist. This should have
+been migrated and tested as part of the custom-domain cutover, not discovered
+by the user after launch.

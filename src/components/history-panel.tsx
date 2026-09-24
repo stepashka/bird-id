@@ -36,7 +36,7 @@ export function HistoryPanel({ userId }: { userId: string }) {
   const loading = loadedForUser !== userId;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 pb-20">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-12">
       <h1 className="font-display text-5xl">Your log</h1>
       <p className="mt-3 max-w-lg text-dusk">
         Identifications stay on your account. Newest first.

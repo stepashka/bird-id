@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/header";
+import { SiteFooter } from "@/components/site-footer";
 import { SightingResult } from "@/components/sighting";
 import type { AppView } from "@/lib/app-view";
 import { authClient, publicBirdApi } from "@/lib/neon-auth";
@@ -37,9 +38,9 @@ export function SharedIdentificationPage({ token }: { token: string }) {
   }
 
   return (
-    <>
+    <div className="flex min-h-dvh flex-col">
       <Header onView={navigateToApp} userEmail={session?.user.email} />
-      <main className="mx-auto w-full max-w-5xl px-6 pb-20">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-12">
         {state.kind === "loading" ? (
           <p className="mt-10 text-lichen">Loading identification…</p>
         ) : state.kind === "unavailable" ? (
@@ -50,6 +51,7 @@ export function SharedIdentificationPage({ token }: { token: string }) {
           <SightingResult sighting={state.sighting} publicView />
         )}
       </main>
-    </>
+      <SiteFooter />
+    </div>
   );
 }

@@ -132,6 +132,7 @@ Browser (Pages or local Vite)
   └─ Function   → https://<branch-id>-api.compute.c-7.us-east-2.aws.neon.tech
                   ├─ Postgres (identifications, share hashes)
                   ├─ private bucket `birds`
+                  ├─ private bucket `screens` (feedback screenshots)
                   └─ AI Gateway (gpt-5-4-mini)
 ```
 
@@ -144,11 +145,43 @@ Routes:
 | `GET /health` | none | liveness |
 | `POST /identify` | JWT | store photo, call vision model, Wikidata names, return sighting |
 | `GET /history` | JWT | that user’s identifications + `shared` flag |
+| `POST /feedback` | JWT | store feedback and an optional private screenshot |
 | `POST /identifications/:id/shares` | JWT + ownership | create 32-byte token, store SHA-256 only |
 | `DELETE /identifications/:id/shares` | JWT + ownership | revoke all links for that row |
 | `GET /shares/:token` | none | allowlisted public sighting + signed photo URL |
 
 `ensureSchema` on the Function is the migration: additive `CREATE` / `ALTER … IF NOT EXISTS`. Deploy with `neon deploy --branch <id> --update-existing --no-env-pull`. Pages deploys are Git `main` only; they never move the Function. Local `.env.local` should point at **`dev`**, not production.
+
+## Social preview limitation and cost budget
+
+GitHub Pages always serves the same static `index.html`. Query parameters can
+select a sighting after React starts, but Telegram, Facebook, Slack, and similar
+crawlers do not execute that JavaScript. Putting a bird name or image URL in
+the query string therefore cannot create per-identification Open Graph tags.
+Dynamic social previews require a Function URL that returns token-specific
+HTML and a token-gated image route.
+
+The intended pattern is:
+
+- generate one approximately 1200 × 630 JPEG when the owner publishes;
+- target **300 KB or less**, stored privately and removed on revoke;
+- serve the Open Graph HTML and image through two token-validated Function
+  requests;
+- keep the existing Pages shared-identification view as the human UI;
+- state clearly that social networks may retain already-cached cards after
+  revocation.
+
+This is also a cost boundary. Neon public transfer is shared by Postgres,
+Object Storage, and Functions. Current published pricing includes 5 GB per
+project on Free, or 500 GB on paid plans followed by $0.10/GB; Function
+invocations are $0.60 per million on paid plans, and Object Storage is
+$0.023/GB-month. At a 300 KB image budget, one crawler render (HTML + image)
+is approximately **$0.00003–$0.00004 after allowances**, or about
+**$0.03–$0.04 per 1,000 renders**. An 8 MB original would be roughly 25 times
+more expensive and would exhaust the Free transfer allowance after only about
+625 fetches, so resizing at publish time is mandatory. Platform caching means
+one recipient does not necessarily equal one new render, but the architecture
+must not rely on that cache for cost control.
 
 ## Google first-login 404 on GitHub origin
 

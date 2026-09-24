@@ -12,6 +12,7 @@ export type SharedIdentificationRow = {
   common_names: LocalizedNames | null;
   alternatives: string[] | null;
   evidence: string[] | null;
+  preview_key: string | null;
 };
 
 export function createShareToken() {

@@ -17,6 +17,7 @@ const sharedRow: SharedIdentificationRow = {
   common_names: { nl: "Putter" },
   alternatives: [],
   evidence: [],
+  preview_key: "previews/goldfinch.jpg",
 };
 
 function fakeDependencies(
@@ -24,6 +25,7 @@ function fakeDependencies(
     createShareResult?: boolean;
     revokeSharesResult?: boolean;
     sharedRow?: SharedIdentificationRow | null;
+    publicAppUrl?: string;
   } = {},
 ): ShareRouteDependencies {
   return {
@@ -33,6 +35,12 @@ function fakeDependencies(
     findShared: async () =>
       "sharedRow" in options ? (options.sharedRow ?? null) : sharedRow,
     signedPhotoUrl: async () => "https://signed.example/photo",
+    publicAppUrl:
+      options.publicAppUrl ?? "https://stepashka.github.io/bird-id/",
+    getPreviewPhoto: async () => ({
+      body: new Uint8Array([255, 216, 255, 217]),
+      contentType: "image/jpeg",
+    }),
   };
 }
 
@@ -61,6 +69,9 @@ describe("share routes", () => {
     const body = await response.json();
     expect(response.status).toBe(201);
     expect(body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(body.url).toMatch(
+      /^http:\/\/localhost\/s\/[A-Za-z0-9_-]{43}$/,
+    );
     expect(createShare).toHaveBeenCalledWith({
       identificationId: "bird-1",
       userId: "owner-1",
@@ -83,6 +94,101 @@ describe("share routes", () => {
     expect(body.userId).toBeUndefined();
     expect(body.objectKey).toBeUndefined();
     expect(body.commonName).toBe("European Goldfinch");
+  });
+
+  it("serves token-specific Open Graph HTML without exposing private fields", async () => {
+    const app = createShareRoutes(fakeDependencies());
+    const token = "a".repeat(43);
+
+    const response = await app.request(`http://localhost/s/${token}`);
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain(
+      '<meta property="og:title" content="European Goldfinch">',
+    );
+    expect(html).toContain(
+      '<meta property="og:description" content="Carduelis carduelis · Identified with Fieldmark">',
+    );
+    expect(html).toContain(
+      `<meta property="og:image" content="http://localhost/s/${token}/photo">`,
+    );
+    expect(html).toContain(
+      `https://stepashka.github.io/bird-id/?share=${token}`,
+    );
+    expect(html).not.toContain("private-user");
+    expect(html).not.toContain("private/photo.jpg");
+  });
+
+  it("uses the configured app URL for human redirects", async () => {
+    const app = createShareRoutes(
+      fakeDependencies({ publicAppUrl: "http://127.0.0.1:5173/" }),
+    );
+
+    const response = await app.request(`/s/${"a".repeat(43)}`);
+
+    expect(await response.text()).toContain(
+      `http://127.0.0.1:5173/?share=${"a".repeat(43)}`,
+    );
+  });
+
+  it("escapes identification names in social HTML", async () => {
+    const app = createShareRoutes(
+      fakeDependencies({
+        sharedRow: {
+          ...sharedRow,
+          common_name: `Kea <script>alert("bird")</script>`,
+        },
+      }),
+    );
+
+    const response = await app.request(`/s/${"a".repeat(43)}`);
+    const html = await response.text();
+
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain(
+      "Kea &lt;script&gt;alert(&quot;bird&quot;)&lt;/script&gt;",
+    );
+  });
+
+  it("serves the generated preview image through the valid token", async () => {
+    const getPreviewPhoto = vi.fn(fakeDependencies().getPreviewPhoto);
+    const app = createShareRoutes({
+      ...fakeDependencies(),
+      getPreviewPhoto,
+    });
+
+    const response = await app.request(`/s/${"a".repeat(43)}/photo`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/jpeg");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([255, 216, 255, 217]),
+    );
+    expect(getPreviewPhoto).toHaveBeenCalledWith(
+      "previews/goldfinch.jpg",
+    );
+  });
+
+  it("returns the same unavailable response for revoked social pages and photos", async () => {
+    const app = createShareRoutes(fakeDependencies({ sharedRow: null }));
+    const token = "a".repeat(43);
+
+    expect((await app.request(`/s/${token}`)).status).toBe(404);
+    expect((await app.request(`/s/${token}/photo`)).status).toBe(404);
+  });
+
+  it("returns unavailable when a preview object has already been removed", async () => {
+    const app = createShareRoutes({
+      ...fakeDependencies(),
+      getPreviewPhoto: async () => null,
+    });
+
+    expect(
+      (await app.request(`/s/${"a".repeat(43)}/photo`)).status,
+    ).toBe(404);
   });
 
   it("revokes only an identification owned by the caller", async () => {

@@ -14,12 +14,21 @@ import {
   parseIdentificationJson,
 } from "../lib/identification";
 import { objectKeyForUser, validateImageUpload } from "../lib/image";
-import type { SharedIdentificationRow } from "../lib/sharing";
 import {
+  publishShare,
+  revokePublishedShares,
+} from "../lib/share-publishing";
+import type { SharedIdentificationRow } from "../lib/sharing";
+import { renderSocialPreview } from "../lib/social-preview";
+import {
+  deleteSocialPreview,
   deleteFeedbackScreenshot,
+  readPhoto,
+  readSocialPreview,
   signedPhotoUrl,
   uploadFeedbackScreenshot,
   uploadPhoto,
+  uploadSocialPreview,
 } from "../lib/storage";
 import { createFeedbackRoutes } from "./feedback-routes";
 import { createShareRoutes } from "./share-routes";
@@ -47,8 +56,11 @@ CREATE TABLE IF NOT EXISTS identification_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identification_id uuid NOT NULL REFERENCES identifications(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
+  preview_key text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE identification_shares
+  ADD COLUMN IF NOT EXISTS preview_key text;
 CREATE INDEX IF NOT EXISTS identification_shares_identification_idx
   ON identification_shares (identification_id);
 CREATE TABLE IF NOT EXISTS feedback (
@@ -214,34 +226,91 @@ app.route(
       }),
     createShare: async (input) => {
       await ensureSchema();
-      const inserted = await pool.query(
-        `INSERT INTO identification_shares (identification_id, token_hash)
-SELECT id, $3
-FROM identifications
-WHERE id = $1 AND user_id = $2
-RETURNING id;`,
-        [input.identificationId, input.userId, input.tokenHash],
+      return publishShare(
+        {
+          findOwnedIdentification: async ({
+            identificationId,
+            userId,
+          }) => {
+            const { rows } = await pool.query<{
+              id: string;
+              object_key: string;
+              existing_preview_key: string | null;
+            }>(
+              `SELECT identification.id,
+                      identification.object_key,
+                      (
+                        SELECT share.preview_key
+                        FROM identification_shares share
+                        WHERE share.identification_id = identification.id
+                          AND share.preview_key IS NOT NULL
+                        LIMIT 1
+                      ) AS existing_preview_key
+               FROM identifications identification
+               WHERE identification.id = $1 AND identification.user_id = $2`,
+              [identificationId, userId],
+            );
+            const row = rows[0];
+            return row
+              ? {
+                  id: row.id,
+                  objectKey: row.object_key,
+                  existingPreviewKey: row.existing_preview_key,
+                }
+              : null;
+          },
+          loadOriginalPhoto: readPhoto,
+          renderPreview: renderSocialPreview,
+          uploadPreview: uploadSocialPreview,
+          insertShare: async ({
+            identificationId,
+            userId,
+            tokenHash,
+            previewKey,
+          }) => {
+            const inserted = await pool.query(
+              `INSERT INTO identification_shares
+                 (identification_id, token_hash, preview_key)
+               SELECT id, $3, $4
+               FROM identifications
+               WHERE id = $1 AND user_id = $2
+               RETURNING id`,
+              [identificationId, userId, tokenHash, previewKey],
+            );
+            return (inserted.rowCount ?? 0) > 0;
+          },
+          deletePreview: deleteSocialPreview,
+        },
+        input,
       );
-      return (inserted.rowCount ?? 0) > 0;
     },
     revokeShares: async (input) => {
       await ensureSchema();
-      const owned = await pool.query(
-        `SELECT id FROM identifications WHERE id = $1 AND user_id = $2`,
-        [input.identificationId, input.userId],
+      return revokePublishedShares(
+        {
+          deletePreview: deleteSocialPreview,
+          removeShares: async ({ identificationId, userId }) => {
+            const owned = await pool.query(
+              `SELECT id
+               FROM identifications
+               WHERE id = $1 AND user_id = $2`,
+              [identificationId, userId],
+            );
+            if ((owned.rowCount ?? 0) === 0) return null;
+
+            const { rows } = await pool.query<{ preview_key: string | null }>(
+              `DELETE FROM identification_shares
+               WHERE identification_id = $1
+               RETURNING preview_key`,
+              [identificationId],
+            );
+            return rows.flatMap((row) =>
+              row.preview_key ? [row.preview_key] : [],
+            );
+          },
+        },
+        input,
       );
-      if ((owned.rowCount ?? 0) === 0) {
-        return false;
-      }
-      await pool.query(
-        `DELETE FROM identification_shares shares
-USING identifications identification
-WHERE shares.identification_id = identification.id
-  AND identification.id = $1
-  AND identification.user_id = $2;`,
-        [input.identificationId, input.userId],
-      );
-      return true;
     },
     findShared: async (tokenHash) => {
       await ensureSchema();
@@ -255,7 +324,8 @@ WHERE shares.identification_id = identification.id
                 identifications.created_at,
                 identifications.common_names,
                 identifications.alternatives,
-                identifications.evidence
+                identifications.evidence,
+                identification_shares.preview_key
          FROM identification_shares
          JOIN identifications
            ON identifications.id = identification_shares.identification_id
@@ -265,6 +335,10 @@ WHERE shares.identification_id = identification.id
       return rows[0] ?? null;
     },
     signedPhotoUrl,
+    publicAppUrl:
+      process.env.SHARE_APP_URL ??
+      "https://stepashka.github.io/bird-id/",
+    getPreviewPhoto: readSocialPreview,
   }),
 );
 

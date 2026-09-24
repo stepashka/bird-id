@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { birdApi } from "@/lib/neon-auth";
 import {
-  buildShareUrl,
   ownerShareUrl,
   shareLink,
   shareMessage,
@@ -26,11 +25,10 @@ export function ShareControls({
     setError(null);
     setOutcome(null);
     try {
-      const { token } = await birdApi.request<{ token: string }>(
+      const { url: nextUrl } = await birdApi.request<{ url: string }>(
         `/identifications/${sighting.id}/shares`,
         { method: "POST" },
       );
-      const nextUrl = buildShareUrl(window.location, token);
       setUrl(nextUrl);
       const nextOutcome = await shareLink({
         url: nextUrl,

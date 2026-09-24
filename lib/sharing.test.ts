@@ -35,6 +35,7 @@ it("allowlists fields returned by the public endpoint", () => {
         common_names: { nl: "Putter" },
         alternatives: ["Eurasian Siskin"],
         evidence: ["red face", "yellow wing bar"],
+        preview_key: "previews/private.jpg",
       },
       "https://signed.example/photo",
     ),

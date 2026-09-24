@@ -1,7 +1,8 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const BUCKET = "birds";
+const BIRDS_BUCKET = "birds";
+const SCREENS_BUCKET = "screens";
 
 function s3() {
   return new S3Client({
@@ -16,10 +17,15 @@ function s3() {
   });
 }
 
-export async function uploadPhoto(key: string, body: Buffer, contentType: string) {
+async function uploadObject(
+  bucket: string,
+  key: string,
+  body: Buffer,
+  contentType: string,
+) {
   await s3().send(
     new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: bucket,
       Key: key,
       Body: body,
       ContentType: contentType,
@@ -27,10 +33,22 @@ export async function uploadPhoto(key: string, body: Buffer, contentType: string
   );
 }
 
+export async function uploadPhoto(key: string, body: Buffer, contentType: string) {
+  await uploadObject(BIRDS_BUCKET, key, body, contentType);
+}
+
+export async function uploadFeedbackScreenshot(
+  key: string,
+  body: Buffer,
+  contentType: string,
+) {
+  await uploadObject(SCREENS_BUCKET, key, body, contentType);
+}
+
 export async function signedPhotoUrl(key: string, expiresIn = 3600) {
   return getSignedUrl(
     s3(),
-    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    new GetObjectCommand({ Bucket: BIRDS_BUCKET, Key: key }),
     { expiresIn },
   );
 }

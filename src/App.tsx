@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { Header, type AppView } from "@/components/header";
 import { HistoryPanel } from "@/components/history-panel";
 import { IdentifyPanel } from "@/components/identify-panel";
@@ -22,7 +23,17 @@ function AuthenticatedApp() {
     <>
       <Header view={view} onView={setView} userEmail={user?.email} />
 
-      {view === "log" ? (
+      {view === "feedback" ? (
+        <main className="mx-auto w-full max-w-5xl px-6 pb-20">
+          <h1 className="font-display text-5xl">Feedback</h1>
+          <p className="mt-3 max-w-xl text-[1.15rem] leading-relaxed text-dusk">
+            Found something confusing, delightful, or broken? Send a short note
+            and, if useful, a screenshot.
+          </p>
+          <FeedbackPanel signedIn={Boolean(user)} />
+          {!isPending && !user ? <AuthPanel /> : null}
+        </main>
+      ) : view === "log" ? (
         user ? (
           <HistoryPanel userId={user.id} />
         ) : (

@@ -1,6 +1,6 @@
 import { authClient } from "@/lib/neon-auth";
 
-export type AppView = "identify" | "log";
+export type AppView = "identify" | "log" | "feedback";
 
 export function Header({
   view,
@@ -38,6 +38,15 @@ export function Header({
           className={view === "log" ? "text-moss" : "text-dusk hover:text-ink"}
         >
           Log
+        </button>
+        <button
+          type="button"
+          onClick={() => onView("feedback")}
+          className={
+            view === "feedback" ? "text-moss" : "text-dusk hover:text-ink"
+          }
+        >
+          Feedback
         </button>
         {userEmail ? (
           <button type="button" onClick={signOut} className="text-dusk hover:text-ink">

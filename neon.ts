@@ -5,6 +5,7 @@ export default defineConfig({
   aiGateway: true,
   buckets: {
     birds: { access: "private" },
+    screens: { access: "private" },
   },
   functions: {
     api: {

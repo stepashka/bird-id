@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { z } from "zod";
 import { AuthError, resolveUserId } from "../lib/auth";
 import { lookupLocalizedNames } from "../lib/bird-names";
+import { feedbackScreenshotKey } from "../lib/feedback";
 import {
   IDENTIFY_SYSTEM_PROMPT,
   parseIdentification,
@@ -14,7 +15,12 @@ import {
 } from "../lib/identification";
 import { objectKeyForUser, validateImageUpload } from "../lib/image";
 import type { SharedIdentificationRow } from "../lib/sharing";
-import { signedPhotoUrl, uploadPhoto } from "../lib/storage";
+import {
+  signedPhotoUrl,
+  uploadFeedbackScreenshot,
+  uploadPhoto,
+} from "../lib/storage";
+import { createFeedbackRoutes } from "./feedback-routes";
 import { createShareRoutes } from "./share-routes";
 
 const SCHEMA_SQL = `
@@ -44,6 +50,16 @@ CREATE TABLE IF NOT EXISTS identification_shares (
 );
 CREATE INDEX IF NOT EXISTS identification_shares_identification_idx
   ON identification_shares (identification_id);
+CREATE TABLE IF NOT EXISTS feedback (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL,
+  message text NOT NULL,
+  screenshot_key text,
+  screenshot_content_type text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS feedback_user_created_idx
+  ON feedback (user_id, created_at DESC);
 `;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -130,6 +146,52 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+app.route(
+  "/",
+  createFeedbackRoutes({
+    resolveUserId: async (authorization) => {
+      try {
+        return await resolveUserId({
+          authorization,
+          jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+        });
+      } catch (error) {
+        if (error instanceof AuthError) {
+          throw new AuthError("Sign in to send feedback.");
+        }
+        throw error;
+      }
+    },
+    saveFeedback: async ({ userId, message, screenshot }) => {
+      await ensureSchema();
+      let screenshotKey: string | null = null;
+      let screenshotContentType: string | null = null;
+
+      if (screenshot) {
+        screenshotKey = feedbackScreenshotKey(userId, screenshot.contentType);
+        screenshotContentType = screenshot.contentType;
+        await uploadFeedbackScreenshot(
+          screenshotKey,
+          Buffer.from(screenshot.bytes),
+          screenshot.contentType,
+        );
+      }
+
+      const { rows } = await pool.query<{
+        id: string;
+        created_at: Date;
+      }>(
+        `INSERT INTO feedback
+          (user_id, message, screenshot_key, screenshot_content_type)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, created_at`,
+        [userId, message, screenshotKey, screenshotContentType],
+      );
+      return { id: rows[0].id, createdAt: rows[0].created_at };
+    },
+  }),
+);
 
 app.route(
   "/",

@@ -35,3 +35,8 @@ export function objectKeyForUser(userId: string, contentType: string): string {
     contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
   return `${userId}/${crypto.randomUUID()}.${ext}`;
 }
+
+export function generatedObjectKeyForUser(userId: string) {
+  const safeUserId = userId.replace(/[^A-Za-z0-9._-]/g, "_");
+  return `generated/${safeUserId}/${crypto.randomUUID()}.jpg`;
+}

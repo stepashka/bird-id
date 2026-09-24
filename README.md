@@ -27,6 +27,7 @@ Set:
 VITE_NEON_AUTH_URL=https://your-branch.neonauth.../neondb/auth
 VITE_NEON_FUNCTION_API_URL=https://your-branch-api.compute...
 NEON_AI_MODEL=gpt-5-4-mini
+NEON_IMAGE_MODEL=gpt-5-mini
 ```
 
 Trust the Vite origin in Neon Auth:
@@ -54,6 +55,22 @@ npx neon@latest deploy --env .env.local
 
 The Function verifies browser JWTs against `NEON_AUTH_JWKS_URL` and derives
 ownership from the JWT `sub`. It does not trust a browser-supplied user id.
+
+### Fictional bird transformations
+
+For an owned **Not a bird** result, the Function can edit the stored source
+photo through Neon AI Gateway and save a linked, explicitly fictional bird.
+Image generation uses the OpenAI Responses `image_generation` tool through
+`neon.tools.imageGeneration()`; it is not a model returned by
+`GET /v1/models` and does not use AI SDK `generateImage()`.
+
+Cost controls:
+
+- `NEON_IMAGE_MODEL` defaults to `gpt-5-mini`;
+- three image-tool invocations per user per UTC day, including paid failures;
+- one successful generated child per **Not a bird** source;
+- generated JPEGs stay private under `generated/` in the existing `birds`
+  bucket.
 
 ## GitHub Pages
 

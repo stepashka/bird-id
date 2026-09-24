@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BirdGenerationControls } from "@/components/bird-generation-controls";
 import { SightingResult } from "@/components/sighting";
 import { ShareControls } from "@/components/share-controls";
 import { birdApi } from "@/lib/neon-auth";
@@ -60,16 +61,31 @@ export function HistoryPanel({ userId }: { userId: string }) {
               sighting={item}
               layout="row"
               actions={
-                <ShareControls
-                  sighting={item}
-                  onSharedChange={(shared) =>
-                    setItems((current) =>
-                      current.map((entry) =>
-                        entry.id === item.id ? { ...entry, shared } : entry,
-                      ),
-                    )
-                  }
-                />
+                <>
+                  <ShareControls
+                    sighting={item}
+                    onSharedChange={(shared) =>
+                      setItems((current) =>
+                        current.map((entry) =>
+                          entry.id === item.id ? { ...entry, shared } : entry,
+                        ),
+                      )
+                    }
+                  />
+                  <BirdGenerationControls
+                    sighting={item}
+                    onGenerated={(generated) =>
+                      setItems((current) => [
+                        generated,
+                        ...current.map((entry) =>
+                          entry.id === item.id
+                            ? { ...entry, hasGeneratedChild: true }
+                            : entry,
+                        ),
+                      ])
+                    }
+                  />
+                </>
               }
             />
           ))}

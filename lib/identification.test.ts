@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseIdentification, parseIdentificationJson } from "../lib/identification";
-import { validateImageUpload } from "../lib/image";
+import { generatedObjectKeyForUser, validateImageUpload } from "../lib/image";
 
 describe("validateImageUpload", () => {
   it("rejects empty files", () => {
@@ -20,6 +20,14 @@ describe("validateImageUpload", () => {
     expect(
       validateImageUpload({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/jpeg" }),
     ).toBeNull();
+  });
+});
+
+describe("generatedObjectKeyForUser", () => {
+  it("creates a private generated JPEG key with a safe user segment", () => {
+    expect(generatedObjectKeyForUser("user/one")).toMatch(
+      /^generated\/user_one\/[0-9a-f-]+\.jpg$/,
+    );
   });
 });
 

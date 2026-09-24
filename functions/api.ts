@@ -3,9 +3,15 @@ import { attachDatabasePool } from "@neon/functions";
 import { generateObject, generateText } from "ai";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { z } from "zod";
 import { AuthError, resolveUserId } from "../lib/auth";
+import { generateBirdTransformation } from "../lib/bird-generation-ai";
+import {
+  reserveGenerationAttempt,
+  type GenerationAttemptPool,
+} from "../lib/bird-generation-attempts";
+import { persistGeneratedAsset } from "../lib/bird-generation-persistence";
 import { lookupLocalizedNames } from "../lib/bird-names";
 import { feedbackScreenshotKey, persistFeedback } from "../lib/feedback";
 import {
@@ -13,7 +19,11 @@ import {
   parseIdentification,
   parseIdentificationJson,
 } from "../lib/identification";
-import { objectKeyForUser, validateImageUpload } from "../lib/image";
+import {
+  generatedObjectKeyForUser,
+  objectKeyForUser,
+  validateImageUpload,
+} from "../lib/image";
 import {
   publishShare,
   revokePublishedShares,
@@ -22,6 +32,7 @@ import type { SharedIdentificationRow } from "../lib/sharing";
 import { renderSocialPreview } from "../lib/social-preview";
 import {
   deleteSocialPreview,
+  deletePhoto,
   deleteFeedbackScreenshot,
   readPhoto,
   readSocialPreview,
@@ -30,6 +41,11 @@ import {
   uploadPhoto,
   uploadSocialPreview,
 } from "../lib/storage";
+import {
+  createBirdGenerationRoutes,
+  GeneratedAlreadyExistsError,
+  type GeneratedSighting,
+} from "./bird-generation-routes";
 import { createFeedbackRoutes } from "./feedback-routes";
 import { createShareRoutes } from "./share-routes";
 
@@ -52,6 +68,27 @@ ALTER TABLE identifications
   ADD COLUMN IF NOT EXISTS alternatives jsonb;
 ALTER TABLE identifications
   ADD COLUMN IF NOT EXISTS evidence jsonb;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS source_identification_id uuid
+    REFERENCES identifications(id) ON DELETE CASCADE;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS is_generated boolean NOT NULL DEFAULT false;
+CREATE UNIQUE INDEX IF NOT EXISTS identifications_one_generated_child_idx
+  ON identifications (source_identification_id)
+  WHERE is_generated AND source_identification_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS bird_generation_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL,
+  source_identification_id uuid NOT NULL
+    REFERENCES identifications(id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN ('started', 'failed', 'succeeded')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS bird_generation_attempts_user_created_idx
+  ON bird_generation_attempts (user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS bird_generation_one_active_attempt_idx
+  ON bird_generation_attempts (source_identification_id)
+  WHERE status = 'started';
 CREATE TABLE IF NOT EXISTS identification_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identification_id uuid NOT NULL REFERENCES identifications(id) ON DELETE CASCADE,
@@ -100,6 +137,112 @@ async function userIdFromRequest(c: { req: { header: (name: string) => string | 
     authorization: c.req.header("authorization"),
     jwksUrl: process.env.NEON_AUTH_JWKS_URL,
   });
+}
+
+type GeneratedBirdPersistenceInput = {
+  attemptId: string;
+  userId: string;
+  sourceIdentificationId: string;
+  generated: Awaited<ReturnType<typeof generateBirdTransformation>>;
+};
+
+async function persistGeneratedBird(
+  input: GeneratedBirdPersistenceInput,
+): Promise<GeneratedSighting> {
+  const persisted = await persistGeneratedAsset<
+    GeneratedBirdPersistenceInput,
+    { id: string; created_at: Date }
+  >({
+    createObjectKey: ({ userId }) => generatedObjectKeyForUser(userId),
+    uploadObject: (objectKey, bytes, contentType) =>
+      uploadPhoto(objectKey, Buffer.from(bytes), contentType),
+    commitRecord: async (objectKey, currentInput) => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const inserted = await client.query<{
+          id: string;
+          created_at: Date;
+        }>(
+          `INSERT INTO identifications
+             (user_id, object_key, content_type, common_name, scientific_name,
+              confidence, common_names, alternatives, evidence,
+              source_identification_id, is_generated)
+           VALUES ($1, $2, $3, $4, $5, 1, '{}'::jsonb, '[]'::jsonb, $6::jsonb,
+                   $7, true)
+           RETURNING id, created_at`,
+          [
+            currentInput.userId,
+            objectKey,
+            currentInput.generated.contentType,
+            currentInput.generated.commonName,
+            currentInput.generated.scientificName,
+            JSON.stringify(["AI-generated fictional bird"]),
+            currentInput.sourceIdentificationId,
+          ],
+        );
+        const completed = await client.query(
+          `UPDATE bird_generation_attempts
+           SET status = 'succeeded'
+           WHERE id = $1
+             AND user_id = $2
+             AND source_identification_id = $3
+             AND status = 'started'`,
+          [
+            currentInput.attemptId,
+            currentInput.userId,
+            currentInput.sourceIdentificationId,
+          ],
+        );
+        if ((completed.rowCount ?? 0) !== 1) {
+          throw new Error("Generation attempt is no longer active.");
+        }
+        await client.query("COMMIT");
+        return inserted.rows[0]!;
+      } catch (error) {
+        await rollback(client);
+        if (isGeneratedChildConflict(error)) {
+          throw new GeneratedAlreadyExistsError();
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    signObject: signedPhotoUrl,
+    deleteObject: deletePhoto,
+  })(input);
+
+  return {
+    id: persisted.record.id,
+    commonName: input.generated.commonName,
+    scientificName: input.generated.scientificName,
+    confidence: 1,
+    createdAt: persisted.record.created_at.toISOString(),
+    photoUrl: persisted.photoUrl,
+    names: {},
+    alternatives: [],
+    evidence: ["AI-generated fictional bird"],
+    shared: false,
+    isGenerated: true,
+    sourceIdentificationId: input.sourceIdentificationId,
+    hasGeneratedChild: false,
+  };
+}
+
+async function rollback(client: PoolClient) {
+  await client.query("ROLLBACK").catch(() => undefined);
+}
+
+function isGeneratedChildConflict(error: unknown) {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "23505" &&
+    "constraint" in error &&
+    error.constraint === "identifications_one_generated_child_idx"
+  );
 }
 
 async function identifyBird(bytes: Uint8Array, contentType: string) {
@@ -218,6 +361,43 @@ app.route(
 
 app.route(
   "/",
+  createBirdGenerationRoutes({
+    resolveUserId: async (authorization) => {
+      try {
+        return await resolveUserId({
+          authorization,
+          jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+        });
+      } catch (error) {
+        if (error instanceof AuthError) {
+          throw new AuthError("Sign in to transform this photo.");
+        }
+        throw error;
+      }
+    },
+    reserveAttempt: async (input) => {
+      await ensureSchema();
+      return reserveGenerationAttempt(
+        pool as unknown as GenerationAttemptPool,
+        input,
+      );
+    },
+    readPhoto,
+    generateBird: generateBirdTransformation,
+    persistGenerated: persistGeneratedBird,
+    failAttempt: async (attemptId) => {
+      await pool.query(
+        `UPDATE bird_generation_attempts
+         SET status = 'failed'
+         WHERE id = $1 AND status = 'started'`,
+        [attemptId],
+      );
+    },
+  }),
+);
+
+app.route(
+  "/",
   createShareRoutes({
     resolveUserId: async (authorization) =>
       resolveUserId({
@@ -325,6 +505,7 @@ app.route(
                 identifications.common_names,
                 identifications.alternatives,
                 identifications.evidence,
+                identifications.is_generated,
                 identification_shares.preview_key
          FROM identification_shares
          JOIN identifications
@@ -395,6 +576,9 @@ app.post("/identify", async (c) => {
       photoUrl,
       names,
       shared: false,
+      isGenerated: false,
+      sourceIdentificationId: null,
+      hasGeneratedChild: false,
       ...identification,
     });
   } catch (error) {
@@ -421,13 +605,21 @@ app.get("/history", async (c) => {
       alternatives: string[] | null;
       evidence: string[] | null;
       shared: boolean;
+      is_generated: boolean;
+      source_identification_id: string | null;
+      has_generated_child: boolean;
     }>(
       `select id, object_key, common_name, scientific_name, confidence, created_at, common_names,
-              alternatives, evidence,
+              alternatives, evidence, is_generated, source_identification_id,
               EXISTS (
                 SELECT 1 FROM identification_shares shares
                 WHERE shares.identification_id = identifications.id
-              ) AS shared
+              ) AS shared,
+              EXISTS (
+                SELECT 1 FROM identifications child
+                WHERE child.source_identification_id = identifications.id
+                  AND child.is_generated
+              ) AS has_generated_child
        from identifications
        where user_id = $1
        order by created_at desc
@@ -447,6 +639,9 @@ app.get("/history", async (c) => {
         alternatives: row.alternatives ?? [],
         evidence: row.evidence ?? [],
         shared: row.shared,
+        isGenerated: row.is_generated,
+        sourceIdentificationId: row.source_identification_id,
+        hasGeneratedChild: row.has_generated_child,
       })),
     );
 

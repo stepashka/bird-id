@@ -56,6 +56,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | **Google first-login return URL** | First Google signup from Pages landed on `https://stepashka.github.io/` (user-site 404); the second attempt worked. Better Auth uses `newUserURL` for registrations. Send `newUserCallbackURL` as origin + Vite base (`/bird-id/`), not the origin root. |
 | **Custom-domain auth migration** | DNS and TLS were validated, but production Neon Auth still trusted only the old Pages origin. The first Google click on `bird-id.app` failed with `403 INVALID_CALLBACKURL`. Adding every new app origin to the branch-scoped Auth domain allowlist and probing `/sign-in/social` must be part of the cutover, before declaring the domain live. |
 | **Cornell donate link** | The Merlin/Cornell donation link was requested, then dropped while the custom-domain work took over. Follow-ups that are not started immediately should stay on the open list until they ship. |
+| **Neon image generation** | `/v1/models` listing no `image` model does not mean images are unsupported. Neon generates and edits images through the GPT Responses `image_generation` tool (`neon.tools.imageGeneration()`), not a `generateImage()` endpoint. The UI can show this even when the catalog does not. |
 
 ## What you had to do outside the agent
 
@@ -150,11 +151,48 @@ Routes:
 | `POST /identify` | JWT | store photo, call vision model, Wikidata names, return sighting |
 | `GET /history` | JWT | that user’s identifications + `shared` flag |
 | `POST /feedback` | JWT | store feedback and an optional private screenshot |
+| `POST /identifications/:id/make-bird` | JWT + ownership | turn a `Not a bird` photo into one labeled fictional bird |
 | `POST /identifications/:id/shares` | JWT + ownership | create 32-byte token, store SHA-256 only |
 | `DELETE /identifications/:id/shares` | JWT + ownership | revoke all links for that row |
 | `GET /shares/:token` | none | allowlisted public sighting + signed photo URL |
 
 `ensureSchema` on the Function is the migration: additive `CREATE` / `ALTER … IF NOT EXISTS`. Deploy with `neon deploy --branch <id> --update-existing --no-env-pull`. Pages deploys are Git `main` only; they never move the Function. Local `.env.local` should point at **`dev`**, not production.
+
+## Fictional bird image generation
+
+Neon AI Gateway supports image generation and image editing, but not through
+an image-model endpoint. `GET /v1/models` therefore showed no image model and
+led the agent to incorrectly conclude that a separate provider was required.
+The installed Neon provider documents the actual path: an enabled GPT model
+calls the Responses API `image_generation` tool through
+`neon.tools.imageGeneration()`. AI SDK `generateImage()` is unsupported.
+
+The **Make it bird-like** flow:
+
+- is available only to the owner of a `Not a bird` identification;
+- defaults to `NEON_IMAGE_MODEL=gpt-5-mini`;
+- preserves the source composition while adding bird traits;
+- allows an optional 200-character creative preference under fixed
+  instructions;
+- stores one linked generated identification in the existing private `birds`
+  bucket;
+- labels app views, public shares, and social metadata
+  **AI-generated fictional bird**;
+- permits three image-tool invocations per user per UTC day, including calls
+  that reached the paid tool but later failed;
+- permits one successful generated child per source.
+
+An attempt ledger, user-scoped transaction lock, and a unique active-attempt
+index stop concurrent clicks from launching duplicate paid edits. A stale
+attempt older than 15 minutes is marked failed so it cannot block the source
+forever.
+
+Dev validation exposed another gateway-specific mismatch: the tool currently
+uses `gpt-image-2`, which rejects `input_fidelity`. Removing that unsupported
+option made the edit succeed while still passing the source as image content.
+A controlled 256 × 256 geometric source became a 58,779-byte JPEG named
+**Marzipan Cublet** (`Aureus boxifrons`) in 58.2 seconds. The probe output was
+inspected and deleted; Neon did not surface per-request cost in this helper.
 
 ## Social preview limitation and cost budget
 

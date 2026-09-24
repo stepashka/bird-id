@@ -11,6 +11,9 @@ export type Sighting = {
   evidence?: string[];
   names?: LocalizedNames;
   shared?: boolean;
+  isGenerated?: boolean;
+  sourceIdentificationId?: string | null;
+  hasGeneratedChild?: boolean;
 };
 
 export function confidenceLabel(confidence: number) {

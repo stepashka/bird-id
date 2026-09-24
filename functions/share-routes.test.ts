@@ -18,6 +18,7 @@ const sharedRow: SharedIdentificationRow = {
   alternatives: [],
   evidence: [],
   preview_key: "previews/goldfinch.jpg",
+  is_generated: false,
 };
 
 function fakeDependencies(
@@ -137,6 +138,28 @@ describe("share routes", () => {
     );
     expect(html).not.toContain("private-user");
     expect(html).not.toContain("private/photo.jpg");
+  });
+
+  it("labels generated birds as fictional in social metadata and body", async () => {
+    const app = createShareRoutes(
+      fakeDependencies({
+        sharedRow: {
+          ...sharedRow,
+          common_name: "Velvet Teapot Finch",
+          scientific_name: "Theiera velutina",
+          is_generated: true,
+        },
+      }),
+    );
+
+    const response = await app.request(`/s/${"a".repeat(43)}`);
+    const html = await response.text();
+
+    expect(html).toContain(
+      '<meta property="og:description" content="Theiera velutina · AI-generated fictional bird · Made with Fieldmark">',
+    );
+    expect(html).toContain(">AI-generated fictional bird<");
+    expect(html).not.toContain("Identified with Fieldmark");
   });
 
   it("uses the configured app URL for human redirects", async () => {

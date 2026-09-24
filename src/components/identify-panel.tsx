@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { BirdGenerationControls } from "@/components/bird-generation-controls";
 import { SightingResult } from "@/components/sighting";
 import { ShareControls } from "@/components/share-controls";
+import { identificationStartState } from "@/lib/bird-generation";
 import { birdApi } from "@/lib/neon-auth";
 import type { Sighting } from "@/lib/sighting";
 
@@ -10,10 +12,14 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sighting, setSighting] = useState<Sighting | null>(null);
+  const [generatedSighting, setGeneratedSighting] = useState<Sighting | null>(
+    null,
+  );
 
   function onFile(next: File | null) {
     setError(null);
     setSighting(null);
+    setGeneratedSighting(null);
     setFile(next);
     setPreview(next ? URL.createObjectURL(next) : null);
   }
@@ -30,6 +36,7 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
 
     setBusy(true);
     setError(null);
+    setGeneratedSighting(identificationStartState(sighting).generatedSighting);
     try {
       const body = new FormData();
       body.set("photo", file);
@@ -37,17 +44,7 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
         method: "POST",
         body,
       });
-      setSighting({
-        id: payload.id,
-        commonName: payload.commonName,
-        scientificName: payload.scientificName,
-        confidence: payload.confidence,
-        createdAt: payload.createdAt,
-        photoUrl: payload.photoUrl,
-        alternatives: payload.alternatives,
-        evidence: payload.evidence,
-        names: payload.names,
-      });
+      setSighting(payload);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -116,19 +113,49 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
       ) : null}
 
       {sighting ? (
-        <SightingResult
-          sighting={sighting}
-          actions={
-            <ShareControls
-              sighting={sighting}
-              onSharedChange={(shared) =>
-                setSighting((current) =>
-                  current ? { ...current, shared } : current,
-                )
+        <>
+          <SightingResult
+            sighting={sighting}
+            actions={
+              <>
+                <ShareControls
+                  sighting={sighting}
+                  onSharedChange={(shared) =>
+                    setSighting((current) =>
+                      current ? { ...current, shared } : current,
+                    )
+                  }
+                />
+                <BirdGenerationControls
+                  sighting={sighting}
+                  onGenerated={(generated) => {
+                    setSighting((current) =>
+                      current
+                        ? { ...current, hasGeneratedChild: true }
+                        : current,
+                    );
+                    setGeneratedSighting(generated);
+                  }}
+                />
+              </>
+            }
+          />
+          {generatedSighting ? (
+            <SightingResult
+              sighting={generatedSighting}
+              actions={
+                <ShareControls
+                  sighting={generatedSighting}
+                  onSharedChange={(shared) =>
+                    setGeneratedSighting((current) =>
+                      current ? { ...current, shared } : current,
+                    )
+                  }
+                />
               }
             />
-          }
-        />
+          ) : null}
+        </>
       ) : null}
     </div>
   );

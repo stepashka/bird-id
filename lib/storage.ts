@@ -56,6 +56,15 @@ export async function uploadPhoto(key: string, body: Buffer, contentType: string
   await uploadObject(BIRDS_BUCKET, key, body, contentType);
 }
 
+export async function deletePhoto(key: string) {
+  await s3().send(
+    new DeleteObjectCommand({
+      Bucket: BIRDS_BUCKET,
+      Key: key,
+    }),
+  );
+}
+
 export async function uploadFeedbackScreenshot(
   key: string,
   body: Buffer,

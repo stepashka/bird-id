@@ -89,6 +89,11 @@ CREATE INDEX IF NOT EXISTS bird_generation_attempts_user_created_idx
 CREATE UNIQUE INDEX IF NOT EXISTS bird_generation_one_active_attempt_idx
   ON bird_generation_attempts (source_identification_id)
   WHERE status = 'started';
+CREATE TABLE IF NOT EXISTS bird_generation_quota_overrides (
+  user_id text PRIMARY KEY,
+  daily_limit integer NOT NULL CHECK (daily_limit > 0),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS identification_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identification_id uuid NOT NULL REFERENCES identifications(id) ON DELETE CASCADE,

@@ -96,6 +96,14 @@ export async function reserveGenerationAttempt(
     } else if (source.has_active_attempt) {
       reservation = { kind: "in_progress" };
     } else {
+      const override = await client.query<{ daily_limit: number }>(
+        `SELECT daily_limit
+         FROM bird_generation_quota_overrides
+         WHERE user_id = $1`,
+        [input.userId],
+      );
+      const dailyLimit =
+        override.rows[0]?.daily_limit ?? GENERATION_DAILY_LIMIT;
       const quota = await client.query<{ attempts: number }>(
         `SELECT count(*)::int AS attempts
          FROM bird_generation_attempts
@@ -104,7 +112,7 @@ export async function reserveGenerationAttempt(
              date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,
         [input.userId],
       );
-      if ((quota.rows[0]?.attempts ?? 0) >= GENERATION_DAILY_LIMIT) {
+      if ((quota.rows[0]?.attempts ?? 0) >= dailyLimit) {
         reservation = { kind: "quota" };
       } else {
         const inserted = await client.query<{ id: string }>(

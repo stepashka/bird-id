@@ -1,7 +1,7 @@
 import { formatLocalizedNames } from "../../lib/bird-names";
 import { googleImagesUrl } from "@/lib/google-images";
 import { confidenceLabel, type Sighting } from "@/lib/sighting";
-import { wikipediaUrl } from "@/lib/wikipedia";
+import { identificationWikipediaUrl } from "@/lib/wikipedia";
 import type { ReactNode } from "react";
 
 export function SightingResult({
@@ -91,18 +91,27 @@ function SightingLinks({
   publicView: boolean;
 }) {
   const imagesUrl = googleImagesUrl(sighting.names?.en ?? sighting.commonName);
+  const wikipediaUrl = identificationWikipediaUrl(
+    sighting.commonName,
+    sighting.scientificName,
+    navigator.language,
+  );
+
+  if (!wikipediaUrl && !imagesUrl) return null;
 
   return (
     <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-      <a
-        className="text-moss underline underline-offset-4"
-        href={wikipediaUrl(sighting.scientificName, navigator.language)}
-        target="_blank"
-        rel="noreferrer"
-        referrerPolicy={publicView ? "no-referrer" : undefined}
-      >
-        View on Wikipedia
-      </a>
+      {wikipediaUrl ? (
+        <a
+          className="text-moss underline underline-offset-4"
+          href={wikipediaUrl}
+          target="_blank"
+          rel="noreferrer"
+          referrerPolicy={publicView ? "no-referrer" : undefined}
+        >
+          View on Wikipedia
+        </a>
+      ) : null}
       {imagesUrl ? (
         <a
           className="text-moss underline underline-offset-4"

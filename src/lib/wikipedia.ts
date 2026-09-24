@@ -10,3 +10,17 @@ export function wikipediaUrl(scientificName: string, browserLanguage: string) {
   url.searchParams.set("search", scientificName);
   return url.toString();
 }
+
+export function identificationWikipediaUrl(
+  commonName: string,
+  scientificName: string,
+  browserLanguage: string,
+) {
+  if (
+    commonName.trim().toLowerCase() === "not a bird" ||
+    scientificName.trim().toLowerCase() === "n/a"
+  ) {
+    return null;
+  }
+  return wikipediaUrl(scientificName, browserLanguage);
+}

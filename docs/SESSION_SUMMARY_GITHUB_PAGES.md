@@ -53,6 +53,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | **Stale Vite / wrong Function** | Local `.env.local` pointed at the experiment Function while Pages pointed at production. Restarting the wrong process, or stashing Google Images during a production deploy, made “I don’t see the link” your problem to debug. The agent should pin port 5173, restart after branch switches, and say which Neon URL the UI is calling. |
 | **Vision model** | Shipping `llama-4-maverick` to the live Function after it failed the two known photos, then waiting for you to say IDs were still bad. Benchmark on the mis-IDs **before** the first Pages backend deploy. |
 | **Process tax after you already said go** | Extra design gates, dual GitHub-account investigation (that one you asked for), then still fumbling production vs experiment Function env. |
+| **Google first-login return URL** | First Google signup from Pages landed on `https://stepashka.github.io/` (user-site 404); the second attempt worked. Better Auth uses `newUserURL` for registrations. Send `newUserCallbackURL` as origin + Vite base (`/bird-id/`), not the origin root. |
 
 ## What you had to do outside the agent
 
@@ -62,7 +63,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | Click GitHub Pages + Actions, and live with first CI hangs | `package-lock.json` had Databricks npm-proxy URLs; Actions cannot use that registry. |
 | Add Neon Auth trusted origin `https://stepashka.github.io` | Exact origin match; path `/bird-id/` is Vite, not Auth. |
 | Enable Google in Neon Auth / Google Cloud | Agent can wire the button; the OAuth client is Console work. |
-| Actually use the app (upload, Google login, Wikipedia, names, Google Images) | HMR/stale servers lied; only a human upload proves identify + Function env. |
+| Actually use the app (upload, Google login, Wikipedia, names, Google Images, share, revoke) | HMR/stale servers lied; only a human upload proves identify + Function env. Native share concatenated description onto the token; first Google login 404ed at origin. |
 | Notice TTL and demand protection | Agent treated `github-pages-neon` as a safe sandbox name. It was production. |
 
 ## Neon / Pages frictions that were real (not excuses)
@@ -74,6 +75,8 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 5. **Protected parent ⇒ new child role passwords.** Documented. Do not “fix” a child by resetting from protected production.
 6. **Pages has one `index.html`.** No per-identification Open Graph preview without another renderer. Share links should be `?share=` query params.
 7. **Corporate npm vs public registry.** Local installs **must** use `~/.npmrc` `registry=https://npm-proxy.cloud.databricks.com/`. GitHub Actions cannot. The agent twice ran `npm ci --registry=https://registry.npmjs.org` (and stripped HTTP_PROXY) on this laptop — that is the wrong direction. Keep the lockfile’s `resolved` URLs on public npm; CI overrides with `actions/setup-node` `registry-url: https://registry.npmjs.org`. Never commit a repo `.npmrc` that points at Databricks (breaks GH) or at public npm (breaks local). Do not pass `--registry` locally.
+8. **Native share `text` concatenated onto the token.** Some OS copy actions join description + URL. Payloads are URL + optional title only.
+9. **First-time Google OAuth 404s at origin** if `newUserCallbackURL` is missing; returning users already used `callbackURL`.
 
 ## Timeline (compressed)
 
@@ -83,8 +86,10 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 4. **Wrong backend:** deploy JWT Function to child `github-pages-neon` with 7d TTL; set GH variables to that Function.
 5. **Google login** on an isolated git/Neon experiment; then **ID quality** — llama wrong, `gpt-5-4-mini` right; ship model to production Function.
 6. **Wikipedia** (localized search by scientific name), **Wikidata names**, **Google Images** — one increment at a time, with you catching stale local servers.
-7. **Share links** designed (hashed opt-in tokens, `?share=`) — implementation still on an isolated worktree, not production.
+7. **Share links** designed (hashed opt-in tokens, `?share=`), implemented on an isolated worktree, validated on Neon `dev`, then shipped to Pages + production Function (`da3fad7`).
 8. **You asked the production branch’s name.** Agent listed `github-pages-neon` / `br-damp-morning-b5l3fkly` and **then** the TTL. Rename to `production`, strip expiry, protect.
+9. **Branching intent:** rename the old test branch to durable Neon `dev`; short-lived feature branches should be **children of `dev`**, not siblings of production. Documented in `docs/BRANCHING_WORKFLOW.md`. This sharing cycle still used `dev` itself rather than a `dev` child.
+10. **Share validation bugs after ship:** native share `text` concatenated onto the URL (fixed: URL + optional title only); public page had no path home (added “Identify a bird with Fieldmark →”); generated URL vanished after Share (kept visible next to Revoke for this session). First-time Google OAuth 404 at origin (fixed: `newUserCallbackURL` = `/bird-id/`). Frontend follow-up `284cee2` on Pages; Function unchanged for that patch.
 
 ## Where time and tokens went (this rewrite)
 
@@ -102,10 +107,11 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 - Pages `VITE_NEON_FUNCTION_API_URL` is **production data**. Print the Neon branch **name, id, `protected`, `expires_at`** before every Function deploy.
 - Never apply `ttl` to a branch referenced by GitHub variables.
 - Protect that branch. Do not reset children of it.
-- Keep experiment Functions on a **sibling** branch (`google-and-id-quality` / `br-bitter-waterfall-b5u6m4d2` is the local test branch to preserve).
+- Keep experiment Functions on durable Neon **`dev`** (`br-bitter-waterfall-b5u6m4d2`). Short-lived feature Neon branches should be **children of `dev`**, not siblings of production and not children of protected `production`.
 - After switching git branches, **kill port 5173 and start with `--strictPort`**. Tell the human which Function URL `.env.local` uses.
 - Local `npm ci` / `npm install`: Databricks proxy from user `~/.npmrc`. GitHub Actions: public `registry.npmjs.org` only. Never `--registry=https://registry.npmjs.org` on this machine.
-- Git cleanup after release: delete **merged** feature branches only. Neon cleanup: never `br-damp-morning-b5l3fkly`, never its parent `br-little-cloud-b5cc6h3k`, never `br-bitter-waterfall-b5u6m4d2`.
+- Git cleanup after release: delete **merged** feature branches only. Neon cleanup: never `br-damp-morning-b5l3fkly`, never its parent `br-little-cloud-b5cc6h3k`, never durable `dev` `br-bitter-waterfall-b5u6m4d2`.
+- Google OAuth from Pages: always set `callbackURL`, `newUserCallbackURL`, and `errorCallbackURL` to `https://stepashka.github.io/bird-id/`. Native share payloads: URL (and optional title) only — never descriptive `text`.
 
 ## Current production pointers
 
@@ -113,8 +119,36 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 - Neon project: `holy-poetry-88306888`
 - Pages data branch: **`production`** / `br-damp-morning-b5l3fkly` — **protected, no expiry**
 - Neon default (not serving Pages): `main` / `br-little-cloud-b5cc6h3k`
-- Local experiment: `google-and-id-quality` / `br-bitter-waterfall-b5u6m4d2` (still has its own TTL — expected for a test branch)
+- Local experiment / durable **`dev`**: `br-bitter-waterfall-b5u6m4d2` (TTL removed; still a sibling of production off default `main`, not yet a parent of feature children)
 - Vision model on production Function: `gpt-5-4-mini`
+
+## How Neon Functions are used
+
+GitHub Pages is a static Vite bundle. It cannot talk to Postgres, Object Storage, or the AI Gateway. That work lives in **one Hono Function per Neon branch**, declared in `neon.ts` as `functions.api` from `functions/api.ts`.
+
+```text
+Browser (Pages or local Vite)
+  ├─ Neon Auth  → Google / email, JWT
+  └─ Function   → https://<branch-id>-api.compute.c-7.us-east-2.aws.neon.tech
+                  ├─ Postgres (identifications, share hashes)
+                  ├─ private bucket `birds`
+                  └─ AI Gateway (gpt-5-4-mini)
+```
+
+The Function URL is the **branch id**, so renaming `github-pages-neon` → `production` did not change Pages. The SPA only stores `VITE_NEON_AUTH_URL` and `VITE_NEON_FUNCTION_API_URL`. Secrets stay on the Function.
+
+Routes:
+
+| Route | Auth | Job |
+|---|---|---|
+| `GET /health` | none | liveness |
+| `POST /identify` | JWT | store photo, call vision model, Wikidata names, return sighting |
+| `GET /history` | JWT | that user’s identifications + `shared` flag |
+| `POST /identifications/:id/shares` | JWT + ownership | create 32-byte token, store SHA-256 only |
+| `DELETE /identifications/:id/shares` | JWT + ownership | revoke all links for that row |
+| `GET /shares/:token` | none | allowlisted public sighting + signed photo URL |
+
+`ensureSchema` on the Function is the migration: additive `CREATE` / `ALTER … IF NOT EXISTS`. Deploy with `neon deploy --branch <id> --update-existing --no-env-pull`. Pages deploys are Git `main` only; they never move the Function. Local `.env.local` should point at **`dev`**, not production.
 
 ## Google first-login 404 on GitHub origin
 

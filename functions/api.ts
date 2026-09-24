@@ -562,6 +562,9 @@ app.post("/identify", async (c) => {
       photoUrl,
       names,
       shared: false,
+      isGenerated: false,
+      sourceIdentificationId: null,
+      hasGeneratedChild: false,
       ...identification,
     });
   } catch (error) {
@@ -588,13 +591,21 @@ app.get("/history", async (c) => {
       alternatives: string[] | null;
       evidence: string[] | null;
       shared: boolean;
+      is_generated: boolean;
+      source_identification_id: string | null;
+      has_generated_child: boolean;
     }>(
       `select id, object_key, common_name, scientific_name, confidence, created_at, common_names,
-              alternatives, evidence,
+              alternatives, evidence, is_generated, source_identification_id,
               EXISTS (
                 SELECT 1 FROM identification_shares shares
                 WHERE shares.identification_id = identifications.id
-              ) AS shared
+              ) AS shared,
+              EXISTS (
+                SELECT 1 FROM identifications child
+                WHERE child.source_identification_id = identifications.id
+                  AND child.is_generated
+              ) AS has_generated_child
        from identifications
        where user_id = $1
        order by created_at desc
@@ -614,6 +625,9 @@ app.get("/history", async (c) => {
         alternatives: row.alternatives ?? [],
         evidence: row.evidence ?? [],
         shared: row.shared,
+        isGenerated: row.is_generated,
+        sourceIdentificationId: row.source_identification_id,
+        hasGeneratedChild: row.has_generated_child,
       })),
     );
 

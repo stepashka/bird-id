@@ -30,6 +30,7 @@ export function SightingResult({
           className="h-24 w-[7.5rem] object-cover"
         />
         <div>
+          <GeneratedBadge generated={sighting.isGenerated} />
           <h2 className="font-display text-[1.85rem] leading-none">
             {sighting.commonName}
           </h2>
@@ -55,6 +56,7 @@ export function SightingResult({
         className="w-full object-cover"
       />
       <div>
+        <GeneratedBadge generated={sighting.isGenerated} />
         <h2 className="font-display text-5xl leading-[0.95]">
           {sighting.commonName}
         </h2>
@@ -68,6 +70,15 @@ export function SightingResult({
         {actions}
       </div>
     </article>
+  );
+}
+
+function GeneratedBadge({ generated }: { generated?: boolean }) {
+  if (!generated) return null;
+  return (
+    <p className="mb-2 inline-block bg-warbler/25 px-2 py-1 text-sm font-semibold text-ink">
+      AI-generated fictional bird
+    </p>
   );
 }
 

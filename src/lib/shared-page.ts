@@ -1,3 +1,4 @@
+import type { AppView } from "./app-view";
 import type { Sighting } from "./sighting";
 
 type SharedPageInput = {
@@ -10,7 +11,18 @@ export function sharedPageHomeHref(location: {
   origin: string;
   pathname: string;
 }) {
-  return new URL(location.pathname, location.origin).toString();
+  return sharedPageViewHref(location, "identify");
+}
+
+export function sharedPageViewHref(
+  location: { origin: string; pathname: string },
+  view: AppView,
+) {
+  const url = new URL(location.pathname, location.origin);
+  if (view !== "identify") {
+    url.searchParams.set("view", view);
+  }
+  return url.toString();
 }
 
 export function sharedPageState(input: SharedPageInput) {

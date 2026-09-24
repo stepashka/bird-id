@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Sighting } from "./sighting";
-import { sharedPageHomeHref, sharedPageState } from "./shared-page";
+import {
+  sharedPageHomeHref,
+  sharedPageState,
+  sharedPageViewHref,
+} from "./shared-page";
 
 const sighting = {} as Sighting;
 
@@ -20,5 +24,22 @@ describe("sharedPageHomeHref", () => {
         pathname: "/bird-id/",
       }),
     ).toBe("https://stepashka.github.io/bird-id/");
+  });
+
+  it("builds main-app navigation without retaining the share token", () => {
+    const location = {
+      origin: "https://stepashka.github.io",
+      pathname: "/bird-id/",
+    };
+
+    expect(sharedPageViewHref(location, "identify")).toBe(
+      "https://stepashka.github.io/bird-id/",
+    );
+    expect(sharedPageViewHref(location, "log")).toBe(
+      "https://stepashka.github.io/bird-id/?view=log",
+    );
+    expect(sharedPageViewHref(location, "feedback")).toBe(
+      "https://stepashka.github.io/bird-id/?view=feedback",
+    );
   });
 });

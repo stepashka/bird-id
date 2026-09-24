@@ -6,7 +6,7 @@ export function Header({
   onView,
   userEmail,
 }: {
-  view: AppView;
+  view?: AppView;
   onView: (view: AppView) => void;
   userEmail?: string;
 }) {

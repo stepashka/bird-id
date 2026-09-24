@@ -53,7 +53,9 @@ storage, quota, and sharing.
 Neon AI Gateway has no `generateImage()` endpoint. Image edits go through
 the OpenAI Responses `image_generation` tool on an enabled GPT model via
 `neon.tools.imageGeneration()`. The original private photo is passed as
-image content on the same request (`inputFidelity: "high"`, JPEG output).
+image content on the same request (JPEG output). Do not send
+`inputFidelity`: Neon currently routes the tool to `gpt-image-2`, which
+rejects that parameter.
 Use streaming (`streamText`) so large image bytes do not hit the gateway’s
 non-streaming size cap.
 

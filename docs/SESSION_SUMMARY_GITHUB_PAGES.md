@@ -151,11 +151,48 @@ Routes:
 | `POST /identify` | JWT | store photo, call vision model, Wikidata names, return sighting |
 | `GET /history` | JWT | that user’s identifications + `shared` flag |
 | `POST /feedback` | JWT | store feedback and an optional private screenshot |
+| `POST /identifications/:id/make-bird` | JWT + ownership | turn a `Not a bird` photo into one labeled fictional bird |
 | `POST /identifications/:id/shares` | JWT + ownership | create 32-byte token, store SHA-256 only |
 | `DELETE /identifications/:id/shares` | JWT + ownership | revoke all links for that row |
 | `GET /shares/:token` | none | allowlisted public sighting + signed photo URL |
 
 `ensureSchema` on the Function is the migration: additive `CREATE` / `ALTER … IF NOT EXISTS`. Deploy with `neon deploy --branch <id> --update-existing --no-env-pull`. Pages deploys are Git `main` only; they never move the Function. Local `.env.local` should point at **`dev`**, not production.
+
+## Fictional bird image generation
+
+Neon AI Gateway supports image generation and image editing, but not through
+an image-model endpoint. `GET /v1/models` therefore showed no image model and
+led the agent to incorrectly conclude that a separate provider was required.
+The installed Neon provider documents the actual path: an enabled GPT model
+calls the Responses API `image_generation` tool through
+`neon.tools.imageGeneration()`. AI SDK `generateImage()` is unsupported.
+
+The **Make it bird-like** flow:
+
+- is available only to the owner of a `Not a bird` identification;
+- defaults to `NEON_IMAGE_MODEL=gpt-5-mini`;
+- preserves the source composition while adding bird traits;
+- allows an optional 200-character creative preference under fixed
+  instructions;
+- stores one linked generated identification in the existing private `birds`
+  bucket;
+- labels app views, public shares, and social metadata
+  **AI-generated fictional bird**;
+- permits three image-tool invocations per user per UTC day, including calls
+  that reached the paid tool but later failed;
+- permits one successful generated child per source.
+
+An attempt ledger, user-scoped transaction lock, and a unique active-attempt
+index stop concurrent clicks from launching duplicate paid edits. A stale
+attempt older than 15 minutes is marked failed so it cannot block the source
+forever.
+
+Dev validation exposed another gateway-specific mismatch: the tool currently
+uses `gpt-image-2`, which rejects `input_fidelity`. Removing that unsupported
+option made the edit succeed while still passing the source as image content.
+A controlled 256 × 256 geometric source became a 58,779-byte JPEG named
+**Marzipan Cublet** (`Aureus boxifrons`) in 58.2 seconds. The probe output was
+inspected and deleted; Neon did not surface per-request cost in this helper.
 
 ## Social preview limitation and cost budget
 

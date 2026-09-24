@@ -15,6 +15,7 @@ export default defineConfig({
       externalPackages: ["sharp"],
       env: {
         NEON_AI_MODEL: process.env.NEON_AI_MODEL ?? "gpt-5-4-mini",
+        NEON_IMAGE_MODEL: process.env.NEON_IMAGE_MODEL ?? "gpt-5-mini",
         SHARE_APP_URL:
           process.env.SHARE_APP_URL ?? "https://bird-id.app/",
         SHARE_PUBLIC_URL:

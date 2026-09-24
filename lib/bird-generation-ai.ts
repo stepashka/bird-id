@@ -33,6 +33,14 @@ const FALLBACK_NAME = {
   scientificName: "Aves imaginaria",
 };
 
+export const IMAGE_GENERATION_OPTIONS = {
+  outputFormat: "jpeg",
+  outputCompression: 82,
+  quality: "medium",
+  size: "1024x1024",
+  moderation: "auto",
+} as const;
+
 export function createBirdGenerator(runners: BirdGenerationRunners) {
   return async (input: {
     source: Uint8Array;
@@ -65,14 +73,7 @@ async function editImageWithNeon(input: {
   const result = streamText({
     model: neon(process.env.NEON_IMAGE_MODEL || "gpt-5-mini"),
     tools: {
-      image_generation: neon.tools.imageGeneration({
-        inputFidelity: "high",
-        outputFormat: "jpeg",
-        outputCompression: 82,
-        quality: "medium",
-        size: "1024x1024",
-        moderation: "auto",
-      }),
+      image_generation: neon.tools.imageGeneration(IMAGE_GENERATION_OPTIONS),
     },
     messages: [
       {

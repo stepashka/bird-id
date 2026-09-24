@@ -1,9 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBirdGenerator } from "./bird-generation-ai";
+import {
+  createBirdGenerator,
+  IMAGE_GENERATION_OPTIONS,
+} from "./bird-generation-ai";
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
 
 describe("createBirdGenerator", () => {
+  it("uses options accepted by Neon's gpt-image-2 tool", () => {
+    expect(IMAGE_GENERATION_OPTIONS).not.toHaveProperty("inputFidelity");
+    expect(IMAGE_GENERATION_OPTIONS).toMatchObject({
+      outputFormat: "jpeg",
+      quality: "medium",
+    });
+  });
+
   it("passes the source image and fixed prompt to the editor", async () => {
     const editImage = vi.fn(async () => JPEG);
     const generate = createBirdGenerator({

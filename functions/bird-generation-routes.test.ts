@@ -45,6 +45,7 @@ function dependencies(
     readPhoto: async () => new Uint8Array([1, 2, 3]),
     generateBird: async () => generated,
     persistGenerated: async () => sighting,
+    readExistingGenerated: async () => null,
     failAttempt: async () => undefined,
     ...overrides,
   };
@@ -101,6 +102,27 @@ describe("bird generation routes", () => {
 
     expect(response.status).toBe(status);
     expect(generateBird).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing generated bird after a completed request was lost", async () => {
+    const app = createBirdGenerationRoutes(
+      dependencies({
+        reserveAttempt: async () => ({ kind: "already_generated" }),
+        readExistingGenerated: async () => sighting,
+      }),
+    );
+
+    const response = await app.request(
+      "/identifications/source-1/make-bird",
+      postBody(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "generated-1",
+      isGenerated: true,
+      sourceIdentificationId: "source-1",
+    });
   });
 
   it("describes quota exhaustion without hard-coding the default limit", async () => {
@@ -197,7 +219,7 @@ describe("bird generation routes", () => {
     expect(persistGenerated).not.toHaveBeenCalled();
   });
 
-  it("maps a generated-child uniqueness race to already transformed", async () => {
+  it("recovers the existing bird after a generated-child uniqueness race", async () => {
     const failAttempt = vi.fn(async () => undefined);
     const app = createBirdGenerationRoutes(
       dependencies({
@@ -205,6 +227,7 @@ describe("bird generation routes", () => {
           throw new GeneratedAlreadyExistsError();
         },
         failAttempt,
+        readExistingGenerated: async () => sighting,
       }),
     );
 
@@ -213,9 +236,11 @@ describe("bird generation routes", () => {
       postBody(),
     );
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error: "This photo already has a fictional bird.",
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      id: "generated-1",
+      isGenerated: true,
+      sourceIdentificationId: "source-1",
     });
     expect(failAttempt).toHaveBeenCalledWith("attempt-1");
   });

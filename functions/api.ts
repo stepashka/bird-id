@@ -235,6 +235,63 @@ async function persistGeneratedBird(
   };
 }
 
+async function readExistingGeneratedBird(input: {
+  userId: string;
+  sourceIdentificationId: string;
+}): Promise<GeneratedSighting | null> {
+  const { rows } = await pool.query<{
+    id: string;
+    object_key: string;
+    common_name: string;
+    scientific_name: string;
+    confidence: number;
+    created_at: Date;
+    common_names: Record<string, string> | null;
+    alternatives: string[] | null;
+    evidence: string[] | null;
+    shared: boolean;
+  }>(
+    `SELECT child.id,
+            child.object_key,
+            child.common_name,
+            child.scientific_name,
+            child.confidence,
+            child.created_at,
+            child.common_names,
+            child.alternatives,
+            child.evidence,
+            EXISTS (
+              SELECT 1
+              FROM identification_shares shares
+              WHERE shares.identification_id = child.id
+            ) AS shared
+     FROM identifications child
+     WHERE child.user_id = $1
+       AND child.source_identification_id = $2
+       AND child.is_generated
+     LIMIT 1`,
+    [input.userId, input.sourceIdentificationId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    commonName: row.common_name,
+    scientificName: row.scientific_name,
+    confidence: row.confidence,
+    createdAt: row.created_at.toISOString(),
+    photoUrl: await signedPhotoUrl(row.object_key),
+    names: row.common_names ?? {},
+    alternatives: row.alternatives ?? [],
+    evidence: row.evidence ?? [],
+    shared: row.shared,
+    isGenerated: true,
+    sourceIdentificationId: input.sourceIdentificationId,
+    hasGeneratedChild: false,
+  };
+}
+
 async function rollback(client: PoolClient) {
   await client.query("ROLLBACK").catch(() => undefined);
 }
@@ -390,6 +447,7 @@ app.route(
     readPhoto,
     generateBird: generateBirdTransformation,
     persistGenerated: persistGeneratedBird,
+    readExistingGenerated: readExistingGeneratedBird,
     failAttempt: async (attemptId) => {
       await pool.query(
         `UPDATE bird_generation_attempts

@@ -2,9 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 import {
   formatLocalizedNames,
   lookupLocalizedNames,
+  NAME_LANGUAGES,
   parseWikidataBindings,
   shouldLookupNames,
 } from "./bird-names";
+
+describe("NAME_LANGUAGES", () => {
+  it("lists English first, then the rest alphabetically by English name", () => {
+    const [first, ...rest] = NAME_LANGUAGES.map((language) => language.label);
+    expect(first).toBe("English");
+    expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b, "en")));
+  });
+});
 
 describe("shouldLookupNames", () => {
   it("skips non-birds", () => {
@@ -32,6 +41,7 @@ describe("parseWikidataBindings", () => {
               hy: { value: "Սովորական կարմրակատար" },
               ka: { value: "ჩვეულებრივი ჩიტბატონა" },
               he: { value: "חוחית" },
+              uk: { value: "Щиглик" },
             },
           ],
         },
@@ -44,6 +54,7 @@ describe("parseWikidataBindings", () => {
       hy: "Սովորական կարմրակատար",
       ka: "ჩვეულებრივი ჩიტბატონა",
       he: "חוחית",
+      uk: "Щиглик",
     });
   });
 
@@ -62,14 +73,16 @@ describe("formatLocalizedNames", () => {
         hy: "Սովորական կարմրակատար",
         ka: "ჩვეულებრივი ჩიტბატონა",
         he: "חוחית",
+        uk: "Щиглик",
       }),
     ).toEqual([
       "English: European goldfinch",
-      "Dutch: Putter",
-      "Japanese: ゴシキヒワ",
       "Armenian: Սովորական կարմրակատար",
+      "Dutch: Putter",
       "Georgian: ჩვეულებრივი ჩიტბატონა",
       "Hebrew: חוחית",
+      "Japanese: ゴシキヒワ",
+      "Ukrainian: Щиглик",
     ]);
   });
 });
@@ -89,7 +102,8 @@ describe("lookupLocalizedNames", () => {
       expect(url.hostname).toBe("query.wikidata.org");
       const query = url.searchParams.get("query");
       expect(query).toContain("Carduelis carduelis");
-      expect(query).toContain("SELECT ?en ?nl ?ru ?es ?ja ?hy ?ka ?he");
+      expect(query).toContain("?uk");
+      expect(query).toContain('FILTER(LANG(?uk) = "uk")');
       return Response.json({
         results: {
           bindings: [

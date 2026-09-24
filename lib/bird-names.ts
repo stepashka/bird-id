@@ -1,12 +1,15 @@
+// English first (the app default). Remaining languages are A–Z by English
+// name so the list is a rule, not a ranking of countries or speakers.
 export const NAME_LANGUAGES = [
   { code: "en", label: "English" },
-  { code: "nl", label: "Dutch" },
-  { code: "ru", label: "Russian" },
-  { code: "es", label: "Spanish" },
-  { code: "ja", label: "Japanese" },
   { code: "hy", label: "Armenian" },
+  { code: "nl", label: "Dutch" },
   { code: "ka", label: "Georgian" },
   { code: "he", label: "Hebrew" },
+  { code: "ja", label: "Japanese" },
+  { code: "ru", label: "Russian" },
+  { code: "es", label: "Spanish" },
+  { code: "uk", label: "Ukrainian" },
 ] as const;
 
 export type NameLanguage = (typeof NAME_LANGUAGES)[number]["code"];
@@ -53,6 +56,20 @@ export function formatLocalizedNames(names: LocalizedNames | undefined) {
   });
 }
 
+function wikidataNamesQuery(scientificName: string) {
+  const select = LANGUAGE_CODES.map((code) => `?${code}`).join(" ");
+  const optionals = LANGUAGE_CODES.map(
+    (code) =>
+      `  OPTIONAL { ?item rdfs:label ?${code} FILTER(LANG(?${code}) = "${code}") }`,
+  ).join("\n");
+  return `
+SELECT ${select} WHERE {
+  ?item wdt:P225 "${scientificName.replaceAll('"', "")}" .
+${optionals}
+}
+LIMIT 1`.trim();
+}
+
 export async function lookupLocalizedNames(
   commonName: string,
   scientificName: string,
@@ -60,22 +77,8 @@ export async function lookupLocalizedNames(
 ): Promise<LocalizedNames> {
   if (!shouldLookupNames(commonName, scientificName)) return {};
 
-  const query = `
-SELECT ?en ?nl ?ru ?es ?ja ?hy ?ka ?he WHERE {
-  ?item wdt:P225 "${scientificName.replaceAll('"', "")}" .
-  OPTIONAL { ?item rdfs:label ?en FILTER(LANG(?en) = "en") }
-  OPTIONAL { ?item rdfs:label ?nl FILTER(LANG(?nl) = "nl") }
-  OPTIONAL { ?item rdfs:label ?ru FILTER(LANG(?ru) = "ru") }
-  OPTIONAL { ?item rdfs:label ?es FILTER(LANG(?es) = "es") }
-  OPTIONAL { ?item rdfs:label ?ja FILTER(LANG(?ja) = "ja") }
-  OPTIONAL { ?item rdfs:label ?hy FILTER(LANG(?hy) = "hy") }
-  OPTIONAL { ?item rdfs:label ?ka FILTER(LANG(?ka) = "ka") }
-  OPTIONAL { ?item rdfs:label ?he FILTER(LANG(?he) = "he") }
-}
-LIMIT 1`.trim();
-
   const url = new URL("https://query.wikidata.org/sparql");
-  url.searchParams.set("query", query);
+  url.searchParams.set("query", wikidataNamesQuery(scientificName));
   url.searchParams.set("format", "json");
 
   const response = await fetcher(url, {

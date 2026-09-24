@@ -7,6 +7,7 @@ const SUPPORTED_LANGUAGES = new Set([
   "hy",
   "ka",
   "he",
+  "uk",
 ]);
 
 export function wikipediaUrl(scientificName: string, browserLanguage: string) {

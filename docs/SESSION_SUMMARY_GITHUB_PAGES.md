@@ -56,6 +56,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | **Google first-login return URL** | First Google signup from Pages landed on `https://stepashka.github.io/` (user-site 404); the second attempt worked. Better Auth uses `newUserURL` for registrations. Send `newUserCallbackURL` as origin + Vite base (`/bird-id/`), not the origin root. |
 | **Custom-domain auth migration** | DNS and TLS were validated, but production Neon Auth still trusted only the old Pages origin. The first Google click on `bird-id.app` failed with `403 INVALID_CALLBACKURL`. Adding every new app origin to the branch-scoped Auth domain allowlist and probing `/sign-in/social` must be part of the cutover, before declaring the domain live. |
 | **Cornell donate link** | The Merlin/Cornell donation link was requested, then dropped while the custom-domain work took over. Follow-ups that are not started immediately should stay on the open list until they ship. |
+| **Neon image generation** | `/v1/models` listing no `image` model does not mean images are unsupported. Neon generates and edits images through the GPT Responses `image_generation` tool (`neon.tools.imageGeneration()`), not a `generateImage()` endpoint. The UI can show this even when the catalog does not. |
 
 ## What you had to do outside the agent
 

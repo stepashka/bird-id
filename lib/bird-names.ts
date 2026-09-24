@@ -4,6 +4,9 @@ export const NAME_LANGUAGES = [
   { code: "ru", label: "Russian" },
   { code: "es", label: "Spanish" },
   { code: "ja", label: "Japanese" },
+  { code: "hy", label: "Armenian" },
+  { code: "ka", label: "Georgian" },
+  { code: "he", label: "Hebrew" },
 ] as const;
 
 export type NameLanguage = (typeof NAME_LANGUAGES)[number]["code"];
@@ -58,13 +61,16 @@ export async function lookupLocalizedNames(
   if (!shouldLookupNames(commonName, scientificName)) return {};
 
   const query = `
-SELECT ?en ?nl ?ru ?es ?ja WHERE {
+SELECT ?en ?nl ?ru ?es ?ja ?hy ?ka ?he WHERE {
   ?item wdt:P225 "${scientificName.replaceAll('"', "")}" .
   OPTIONAL { ?item rdfs:label ?en FILTER(LANG(?en) = "en") }
   OPTIONAL { ?item rdfs:label ?nl FILTER(LANG(?nl) = "nl") }
   OPTIONAL { ?item rdfs:label ?ru FILTER(LANG(?ru) = "ru") }
   OPTIONAL { ?item rdfs:label ?es FILTER(LANG(?es) = "es") }
   OPTIONAL { ?item rdfs:label ?ja FILTER(LANG(?ja) = "ja") }
+  OPTIONAL { ?item rdfs:label ?hy FILTER(LANG(?hy) = "hy") }
+  OPTIONAL { ?item rdfs:label ?ka FILTER(LANG(?ka) = "ka") }
+  OPTIONAL { ?item rdfs:label ?he FILTER(LANG(?he) = "he") }
 }
 LIMIT 1`.trim();
 

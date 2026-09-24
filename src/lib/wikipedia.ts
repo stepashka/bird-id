@@ -1,4 +1,13 @@
-const SUPPORTED_LANGUAGES = new Set(["en", "nl", "ru", "es", "ja"]);
+const SUPPORTED_LANGUAGES = new Set([
+  "en",
+  "nl",
+  "ru",
+  "es",
+  "ja",
+  "hy",
+  "ka",
+  "he",
+]);
 
 export function wikipediaUrl(scientificName: string, browserLanguage: string) {
   const requestedLanguage = browserLanguage.split("-")[0]?.toLowerCase();

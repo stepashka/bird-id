@@ -29,6 +29,9 @@ describe("parseWikidataBindings", () => {
               nl: { value: "Putter" },
               ru: { value: "Черноголовый щегол" },
               ja: { value: "ゴシキヒワ" },
+              hy: { value: "Սովորական կարմրակատար" },
+              ka: { value: "ჩვეულებრივი ჩიტბატონა" },
+              he: { value: "חוחית" },
             },
           ],
         },
@@ -38,6 +41,9 @@ describe("parseWikidataBindings", () => {
       nl: "Putter",
       ru: "Черноголовый щегол",
       ja: "ゴシキヒワ",
+      hy: "Սովորական կարմրակատար",
+      ka: "ჩვეულებრივი ჩიტბატონა",
+      he: "חוחית",
     });
   });
 
@@ -53,11 +59,17 @@ describe("formatLocalizedNames", () => {
         ja: "ゴシキヒワ",
         en: "European goldfinch",
         nl: "Putter",
+        hy: "Սովորական կարմրակատար",
+        ka: "ჩვეულებრივი ჩიტბატონა",
+        he: "חוחית",
       }),
     ).toEqual([
       "English: European goldfinch",
       "Dutch: Putter",
       "Japanese: ゴシキヒワ",
+      "Armenian: Սովորական կարմրակատար",
+      "Georgian: ჩვეულებრივი ჩიტბატონა",
+      "Hebrew: חוחית",
     ]);
   });
 });
@@ -75,7 +87,9 @@ describe("lookupLocalizedNames", () => {
     const fetcher = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input));
       expect(url.hostname).toBe("query.wikidata.org");
-      expect(url.searchParams.get("query")).toContain("Carduelis carduelis");
+      const query = url.searchParams.get("query");
+      expect(query).toContain("Carduelis carduelis");
+      expect(query).toContain("SELECT ?en ?nl ?ru ?es ?ja ?hy ?ka ?he");
       return Response.json({
         results: {
           bindings: [

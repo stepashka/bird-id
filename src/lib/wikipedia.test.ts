@@ -16,6 +16,16 @@ describe("wikipediaUrl", () => {
       "https://en.wikipedia.org/wiki/Special:Search?search=Pitangus+sulphuratus",
     );
   });
+
+  it.each([
+    ["hy-AM", "hy"],
+    ["ka-GE", "ka"],
+    ["he-IL", "he"],
+  ])("supports %s bird searches", (browserLanguage, wikiLanguage) => {
+    expect(wikipediaUrl("Carduelis carduelis", browserLanguage)).toBe(
+      `https://${wikiLanguage}.wikipedia.org/wiki/Special:Search?search=Carduelis+carduelis`,
+    );
+  });
 });
 
 describe("identificationWikipediaUrl", () => {

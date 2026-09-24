@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BirdGenerationControls } from "@/components/bird-generation-controls";
 import { SightingResult } from "@/components/sighting";
 import { ShareControls } from "@/components/share-controls";
+import { identificationStartState } from "@/lib/bird-generation";
 import { birdApi } from "@/lib/neon-auth";
 import type { Sighting } from "@/lib/sighting";
 
@@ -35,6 +36,7 @@ export function IdentifyPanel({ signedIn }: { signedIn: boolean }) {
 
     setBusy(true);
     setError(null);
+    setGeneratedSighting(identificationStartState(sighting).generatedSighting);
     try {
       const body = new FormData();
       body.set("photo", file);

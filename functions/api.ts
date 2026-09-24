@@ -11,6 +11,7 @@ import {
   reserveGenerationAttempt,
   type GenerationAttemptPool,
 } from "../lib/bird-generation-attempts";
+import { persistGeneratedAsset } from "../lib/bird-generation-persistence";
 import { lookupLocalizedNames } from "../lib/bird-names";
 import { feedbackScreenshotKey, persistFeedback } from "../lib/feedback";
 import {
@@ -138,83 +139,95 @@ async function userIdFromRequest(c: { req: { header: (name: string) => string | 
   });
 }
 
-async function persistGeneratedBird(input: {
+type GeneratedBirdPersistenceInput = {
   attemptId: string;
   userId: string;
   sourceIdentificationId: string;
   generated: Awaited<ReturnType<typeof generateBirdTransformation>>;
-}): Promise<GeneratedSighting> {
-  const objectKey = generatedObjectKeyForUser(input.userId);
-  await uploadPhoto(
-    objectKey,
-    Buffer.from(input.generated.bytes),
-    input.generated.contentType,
-  );
+};
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const inserted = await client.query<{
-      id: string;
-      created_at: Date;
-    }>(
-      `INSERT INTO identifications
-         (user_id, object_key, content_type, common_name, scientific_name,
-          confidence, common_names, alternatives, evidence,
-          source_identification_id, is_generated)
-       VALUES ($1, $2, $3, $4, $5, 1, '{}'::jsonb, '[]'::jsonb, $6::jsonb,
-               $7, true)
-       RETURNING id, created_at`,
-      [
-        input.userId,
-        objectKey,
-        input.generated.contentType,
-        input.generated.commonName,
-        input.generated.scientificName,
-        JSON.stringify(["AI-generated fictional bird"]),
-        input.sourceIdentificationId,
-      ],
-    );
-    const completed = await client.query(
-      `UPDATE bird_generation_attempts
-       SET status = 'succeeded'
-       WHERE id = $1
-         AND user_id = $2
-         AND source_identification_id = $3
-         AND status = 'started'`,
-      [input.attemptId, input.userId, input.sourceIdentificationId],
-    );
-    if ((completed.rowCount ?? 0) !== 1) {
-      throw new Error("Generation attempt is no longer active.");
-    }
-    await client.query("COMMIT");
+async function persistGeneratedBird(
+  input: GeneratedBirdPersistenceInput,
+): Promise<GeneratedSighting> {
+  const persisted = await persistGeneratedAsset<
+    GeneratedBirdPersistenceInput,
+    { id: string; created_at: Date }
+  >({
+    createObjectKey: ({ userId }) => generatedObjectKeyForUser(userId),
+    uploadObject: (objectKey, bytes, contentType) =>
+      uploadPhoto(objectKey, Buffer.from(bytes), contentType),
+    commitRecord: async (objectKey, currentInput) => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const inserted = await client.query<{
+          id: string;
+          created_at: Date;
+        }>(
+          `INSERT INTO identifications
+             (user_id, object_key, content_type, common_name, scientific_name,
+              confidence, common_names, alternatives, evidence,
+              source_identification_id, is_generated)
+           VALUES ($1, $2, $3, $4, $5, 1, '{}'::jsonb, '[]'::jsonb, $6::jsonb,
+                   $7, true)
+           RETURNING id, created_at`,
+          [
+            currentInput.userId,
+            objectKey,
+            currentInput.generated.contentType,
+            currentInput.generated.commonName,
+            currentInput.generated.scientificName,
+            JSON.stringify(["AI-generated fictional bird"]),
+            currentInput.sourceIdentificationId,
+          ],
+        );
+        const completed = await client.query(
+          `UPDATE bird_generation_attempts
+           SET status = 'succeeded'
+           WHERE id = $1
+             AND user_id = $2
+             AND source_identification_id = $3
+             AND status = 'started'`,
+          [
+            currentInput.attemptId,
+            currentInput.userId,
+            currentInput.sourceIdentificationId,
+          ],
+        );
+        if ((completed.rowCount ?? 0) !== 1) {
+          throw new Error("Generation attempt is no longer active.");
+        }
+        await client.query("COMMIT");
+        return inserted.rows[0]!;
+      } catch (error) {
+        await rollback(client);
+        if (isGeneratedChildConflict(error)) {
+          throw new GeneratedAlreadyExistsError();
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    signObject: signedPhotoUrl,
+    deleteObject: deletePhoto,
+  })(input);
 
-    const row = inserted.rows[0]!;
-    return {
-      id: row.id,
-      commonName: input.generated.commonName,
-      scientificName: input.generated.scientificName,
-      confidence: 1,
-      createdAt: row.created_at.toISOString(),
-      photoUrl: await signedPhotoUrl(objectKey),
-      names: {},
-      alternatives: [],
-      evidence: ["AI-generated fictional bird"],
-      shared: false,
-      isGenerated: true,
-      sourceIdentificationId: input.sourceIdentificationId,
-      hasGeneratedChild: false,
-    };
-  } catch (error) {
-    await rollback(client);
-    await deletePhoto(objectKey).catch(() => undefined);
-    if (isGeneratedChildConflict(error)) {
-      throw new GeneratedAlreadyExistsError();
-    }
-    throw error;
-  } finally {
-    client.release();
-  }
+  return {
+    id: persisted.record.id,
+    commonName: input.generated.commonName,
+    scientificName: input.generated.scientificName,
+    confidence: 1,
+    createdAt: persisted.record.created_at.toISOString(),
+    photoUrl: persisted.photoUrl,
+    names: {},
+    alternatives: [],
+    evidence: ["AI-generated fictional bird"],
+    shared: false,
+    isGenerated: true,
+    sourceIdentificationId: input.sourceIdentificationId,
+    hasGeneratedChild: false,
+  };
 }
 
 async function rollback(client: PoolClient) {

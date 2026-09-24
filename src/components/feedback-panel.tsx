@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { birdApi } from "@/lib/neon-auth";
 import {
   feedbackMessageError,
+  feedbackScreenshotError,
   MAX_FEEDBACK_LENGTH,
   normalizeFeedbackMessage,
 } from "@/lib/feedback";
@@ -13,6 +14,23 @@ export function FeedbackPanel({ signedIn }: { signedIn: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  function chooseScreenshot(file: File | null) {
+    setError(null);
+    setSent(false);
+    if (!file || file.size === 0) {
+      setScreenshot(null);
+      return;
+    }
+    const invalid = feedbackScreenshotError(file);
+    if (invalid) {
+      setScreenshot(null);
+      setFileInputKey((value) => value + 1);
+      setError(invalid);
+      return;
+    }
+    setScreenshot(file);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,7 +92,7 @@ export function FeedbackPanel({ signedIn }: { signedIn: boolean }) {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={(event) =>
-              setScreenshot(event.target.files?.[0] ?? null)
+              chooseScreenshot(event.target.files?.[0] ?? null)
             }
             className="border border-ink/25 bg-paper p-2"
           />

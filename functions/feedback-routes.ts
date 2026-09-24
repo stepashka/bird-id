@@ -1,8 +1,10 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { AuthError } from "../lib/auth";
-import { validateImageUpload } from "../lib/image";
+import { feedbackScreenshotError } from "../lib/feedback";
 
 const MAX_FEEDBACK_LENGTH = 4000;
+const MAX_FEEDBACK_BODY_BYTES = 9 * 1024 * 1024;
 
 export type FeedbackScreenshot = {
   bytes: Uint8Array;
@@ -21,11 +23,20 @@ export type FeedbackRouteDependencies = {
 export function createFeedbackRoutes(deps: FeedbackRouteDependencies) {
   const app = new Hono();
 
-  app.post("/feedback", async (c) => {
+  app.post(
+    "/feedback",
+    bodyLimit({
+      maxSize: MAX_FEEDBACK_BODY_BYTES,
+      onError: (c) =>
+        c.json({ error: "Feedback attachments must be 8 MB or smaller." }, 413),
+    }),
+    async (c) => {
     try {
       const userId = await deps.resolveUserId(c.req.header("Authorization"));
       const form = await c.req.formData();
-      const message = String(form.get("message") ?? "").trim();
+      const messageValue = form.get("message");
+      const message =
+        typeof messageValue === "string" ? messageValue.trim() : "";
 
       if (!message) {
         return c.json(
@@ -43,14 +54,19 @@ export function createFeedbackRoutes(deps: FeedbackRouteDependencies) {
       const screenshotValue = form.get("screenshot");
       let screenshot: FeedbackScreenshot | undefined;
       if (screenshotValue instanceof File) {
-        const bytes = new Uint8Array(await screenshotValue.arrayBuffer());
         const contentType =
           screenshotValue.type || "application/octet-stream";
-        const invalid = validateImageUpload({ bytes, contentType });
+        const invalid = feedbackScreenshotError({
+          size: screenshotValue.size,
+          contentType,
+        });
         if (invalid) {
-          return c.json({ error: invalid.message }, 400);
+          return c.json({ error: invalid }, 400);
         }
-        screenshot = { bytes, contentType };
+        if (screenshotValue.size > 0) {
+          const bytes = new Uint8Array(await screenshotValue.arrayBuffer());
+          screenshot = { bytes, contentType };
+        }
       }
 
       const saved = await deps.saveFeedback({ userId, message, screenshot });
@@ -64,7 +80,8 @@ export function createFeedbackRoutes(deps: FeedbackRouteDependencies) {
       }
       return c.json({ error: "Could not submit feedback." }, 500);
     }
-  });
+    },
+  );
 
   return app;
 }

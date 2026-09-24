@@ -7,7 +7,7 @@ import { Pool } from "pg";
 import { z } from "zod";
 import { AuthError, resolveUserId } from "../lib/auth";
 import { lookupLocalizedNames } from "../lib/bird-names";
-import { feedbackScreenshotKey } from "../lib/feedback";
+import { feedbackScreenshotKey, persistFeedback } from "../lib/feedback";
 import {
   IDENTIFY_SYSTEM_PROMPT,
   parseIdentification,
@@ -16,6 +16,7 @@ import {
 import { objectKeyForUser, validateImageUpload } from "../lib/image";
 import type { SharedIdentificationRow } from "../lib/sharing";
 import {
+  deleteFeedbackScreenshot,
   signedPhotoUrl,
   uploadFeedbackScreenshot,
   uploadPhoto,
@@ -165,30 +166,40 @@ app.route(
     },
     saveFeedback: async ({ userId, message, screenshot }) => {
       await ensureSchema();
-      let screenshotKey: string | null = null;
-      let screenshotContentType: string | null = null;
-
-      if (screenshot) {
-        screenshotKey = feedbackScreenshotKey(userId, screenshot.contentType);
-        screenshotContentType = screenshot.contentType;
-        await uploadFeedbackScreenshot(
-          screenshotKey,
-          Buffer.from(screenshot.bytes),
-          screenshot.contentType,
-        );
-      }
-
-      const { rows } = await pool.query<{
-        id: string;
-        created_at: Date;
-      }>(
-        `INSERT INTO feedback
-          (user_id, message, screenshot_key, screenshot_content_type)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, created_at`,
-        [userId, message, screenshotKey, screenshotContentType],
+      return persistFeedback(
+        {
+          insertFeedback: async ({ userId, message }) => {
+            const { rows } = await pool.query<{
+              id: string;
+              created_at: Date;
+            }>(
+              `INSERT INTO feedback (user_id, message)
+               VALUES ($1, $2)
+               RETURNING id, created_at`,
+              [userId, message],
+            );
+            return { id: rows[0].id, createdAt: rows[0].created_at };
+          },
+          uploadScreenshot: async (key, bytes, contentType) =>
+            uploadFeedbackScreenshot(key, Buffer.from(bytes), contentType),
+          attachScreenshot: async ({ feedbackId, key, contentType }) => {
+            await pool.query(
+              `UPDATE feedback
+               SET screenshot_key = $2, screenshot_content_type = $3
+               WHERE id = $1`,
+              [feedbackId, key, contentType],
+            );
+          },
+          deleteFeedback: async (feedbackId) => {
+            await pool.query(`DELETE FROM feedback WHERE id = $1`, [
+              feedbackId,
+            ]);
+          },
+          deleteScreenshot: deleteFeedbackScreenshot,
+          screenshotKey: feedbackScreenshotKey,
+        },
+        { userId, message, screenshot },
       );
-      return { id: rows[0].id, createdAt: rows[0].created_at };
     },
   }),
 );

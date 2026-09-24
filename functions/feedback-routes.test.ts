@@ -118,6 +118,45 @@ describe("feedback routes", () => {
     });
   });
 
+  it("treats an empty optional screenshot as omitted", async () => {
+    const saveFeedback = vi.fn(fakeDependencies().saveFeedback);
+    const app = createFeedbackRoutes(fakeDependencies({ saveFeedback }));
+    const screenshot = new File([], "screen.png", { type: "image/png" });
+
+    const response = await app.request(
+      "/feedback",
+      requestForm("Text feedback still matters.", screenshot),
+    );
+
+    expect(response.status).toBe(201);
+    expect(saveFeedback).toHaveBeenCalledWith({
+      userId: "user-1",
+      message: "Text feedback still matters.",
+      screenshot: undefined,
+    });
+  });
+
+  it("rejects an oversized screenshot before submission", async () => {
+    const saveFeedback = vi.fn();
+    const app = createFeedbackRoutes(fakeDependencies({ saveFeedback }));
+    const screenshot = new File(
+      [new Uint8Array(8 * 1024 * 1024 + 1)],
+      "screen.png",
+      { type: "image/png" },
+    );
+
+    const response = await app.request(
+      "/feedback",
+      requestForm("Large screenshot.", screenshot),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Screenshots must be 8 MB or smaller.",
+    });
+    expect(saveFeedback).not.toHaveBeenCalled();
+  });
+
   it("rejects an unsupported screenshot type", async () => {
     const saveFeedback = vi.fn();
     const app = createFeedbackRoutes(fakeDependencies({ saveFeedback }));
@@ -132,7 +171,7 @@ describe("feedback routes", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: "Use a JPEG, PNG, or WebP photo.",
+      error: "Use a JPEG, PNG, or WebP screenshot.",
     });
     expect(saveFeedback).not.toHaveBeenCalled();
   });

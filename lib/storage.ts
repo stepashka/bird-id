@@ -1,4 +1,9 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const BIRDS_BUCKET = "birds";
@@ -43,6 +48,15 @@ export async function uploadFeedbackScreenshot(
   contentType: string,
 ) {
   await uploadObject(SCREENS_BUCKET, key, body, contentType);
+}
+
+export async function deleteFeedbackScreenshot(key: string) {
+  await s3().send(
+    new DeleteObjectCommand({
+      Bucket: SCREENS_BUCKET,
+      Key: key,
+    }),
+  );
 }
 
 export async function signedPhotoUrl(key: string, expiresIn = 3600) {

@@ -3,9 +3,14 @@ import { attachDatabasePool } from "@neon/functions";
 import { generateObject, generateText } from "ai";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { z } from "zod";
 import { AuthError, resolveUserId } from "../lib/auth";
+import { generateBirdTransformation } from "../lib/bird-generation-ai";
+import {
+  reserveGenerationAttempt,
+  type GenerationAttemptPool,
+} from "../lib/bird-generation-attempts";
 import { lookupLocalizedNames } from "../lib/bird-names";
 import { feedbackScreenshotKey, persistFeedback } from "../lib/feedback";
 import {
@@ -13,7 +18,11 @@ import {
   parseIdentification,
   parseIdentificationJson,
 } from "../lib/identification";
-import { objectKeyForUser, validateImageUpload } from "../lib/image";
+import {
+  generatedObjectKeyForUser,
+  objectKeyForUser,
+  validateImageUpload,
+} from "../lib/image";
 import {
   publishShare,
   revokePublishedShares,
@@ -22,6 +31,7 @@ import type { SharedIdentificationRow } from "../lib/sharing";
 import { renderSocialPreview } from "../lib/social-preview";
 import {
   deleteSocialPreview,
+  deletePhoto,
   deleteFeedbackScreenshot,
   readPhoto,
   readSocialPreview,
@@ -30,6 +40,11 @@ import {
   uploadPhoto,
   uploadSocialPreview,
 } from "../lib/storage";
+import {
+  createBirdGenerationRoutes,
+  GeneratedAlreadyExistsError,
+  type GeneratedSighting,
+} from "./bird-generation-routes";
 import { createFeedbackRoutes } from "./feedback-routes";
 import { createShareRoutes } from "./share-routes";
 
@@ -52,6 +67,27 @@ ALTER TABLE identifications
   ADD COLUMN IF NOT EXISTS alternatives jsonb;
 ALTER TABLE identifications
   ADD COLUMN IF NOT EXISTS evidence jsonb;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS source_identification_id uuid
+    REFERENCES identifications(id) ON DELETE CASCADE;
+ALTER TABLE identifications
+  ADD COLUMN IF NOT EXISTS is_generated boolean NOT NULL DEFAULT false;
+CREATE UNIQUE INDEX IF NOT EXISTS identifications_one_generated_child_idx
+  ON identifications (source_identification_id)
+  WHERE is_generated AND source_identification_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS bird_generation_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL,
+  source_identification_id uuid NOT NULL
+    REFERENCES identifications(id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN ('started', 'failed', 'succeeded')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS bird_generation_attempts_user_created_idx
+  ON bird_generation_attempts (user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS bird_generation_one_active_attempt_idx
+  ON bird_generation_attempts (source_identification_id)
+  WHERE status = 'started';
 CREATE TABLE IF NOT EXISTS identification_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identification_id uuid NOT NULL REFERENCES identifications(id) ON DELETE CASCADE,
@@ -100,6 +136,100 @@ async function userIdFromRequest(c: { req: { header: (name: string) => string | 
     authorization: c.req.header("authorization"),
     jwksUrl: process.env.NEON_AUTH_JWKS_URL,
   });
+}
+
+async function persistGeneratedBird(input: {
+  attemptId: string;
+  userId: string;
+  sourceIdentificationId: string;
+  generated: Awaited<ReturnType<typeof generateBirdTransformation>>;
+}): Promise<GeneratedSighting> {
+  const objectKey = generatedObjectKeyForUser(input.userId);
+  await uploadPhoto(
+    objectKey,
+    Buffer.from(input.generated.bytes),
+    input.generated.contentType,
+  );
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const inserted = await client.query<{
+      id: string;
+      created_at: Date;
+    }>(
+      `INSERT INTO identifications
+         (user_id, object_key, content_type, common_name, scientific_name,
+          confidence, common_names, alternatives, evidence,
+          source_identification_id, is_generated)
+       VALUES ($1, $2, $3, $4, $5, 1, '{}'::jsonb, '[]'::jsonb, $6::jsonb,
+               $7, true)
+       RETURNING id, created_at`,
+      [
+        input.userId,
+        objectKey,
+        input.generated.contentType,
+        input.generated.commonName,
+        input.generated.scientificName,
+        JSON.stringify(["AI-generated fictional bird"]),
+        input.sourceIdentificationId,
+      ],
+    );
+    const completed = await client.query(
+      `UPDATE bird_generation_attempts
+       SET status = 'succeeded'
+       WHERE id = $1
+         AND user_id = $2
+         AND source_identification_id = $3
+         AND status = 'started'`,
+      [input.attemptId, input.userId, input.sourceIdentificationId],
+    );
+    if ((completed.rowCount ?? 0) !== 1) {
+      throw new Error("Generation attempt is no longer active.");
+    }
+    await client.query("COMMIT");
+
+    const row = inserted.rows[0]!;
+    return {
+      id: row.id,
+      commonName: input.generated.commonName,
+      scientificName: input.generated.scientificName,
+      confidence: 1,
+      createdAt: row.created_at.toISOString(),
+      photoUrl: await signedPhotoUrl(objectKey),
+      names: {},
+      alternatives: [],
+      evidence: ["AI-generated fictional bird"],
+      shared: false,
+      isGenerated: true,
+      sourceIdentificationId: input.sourceIdentificationId,
+      hasGeneratedChild: false,
+    };
+  } catch (error) {
+    await rollback(client);
+    await deletePhoto(objectKey).catch(() => undefined);
+    if (isGeneratedChildConflict(error)) {
+      throw new GeneratedAlreadyExistsError();
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function rollback(client: PoolClient) {
+  await client.query("ROLLBACK").catch(() => undefined);
+}
+
+function isGeneratedChildConflict(error: unknown) {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "23505" &&
+    "constraint" in error &&
+    error.constraint === "identifications_one_generated_child_idx"
+  );
 }
 
 async function identifyBird(bytes: Uint8Array, contentType: string) {
@@ -211,6 +341,43 @@ app.route(
           screenshotKey: feedbackScreenshotKey,
         },
         { userId, message, screenshot },
+      );
+    },
+  }),
+);
+
+app.route(
+  "/",
+  createBirdGenerationRoutes({
+    resolveUserId: async (authorization) => {
+      try {
+        return await resolveUserId({
+          authorization,
+          jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+        });
+      } catch (error) {
+        if (error instanceof AuthError) {
+          throw new AuthError("Sign in to transform this photo.");
+        }
+        throw error;
+      }
+    },
+    reserveAttempt: async (input) => {
+      await ensureSchema();
+      return reserveGenerationAttempt(
+        pool as unknown as GenerationAttemptPool,
+        input,
+      );
+    },
+    readPhoto,
+    generateBird: generateBirdTransformation,
+    persistGenerated: persistGeneratedBird,
+    failAttempt: async (attemptId) => {
+      await pool.query(
+        `UPDATE bird_generation_attempts
+         SET status = 'failed'
+         WHERE id = $1 AND status = 'started'`,
+        [attemptId],
       );
     },
   }),

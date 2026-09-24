@@ -18,6 +18,7 @@ type SourceRow = {
 function fakePool(input: {
   source?: SourceRow;
   attempts?: number;
+  dailyLimit?: number;
 }) {
   const statements: string[] = [];
   const client: GenerationAttemptClient = {
@@ -28,6 +29,14 @@ function fakePool(input: {
       }
       if (sql.includes("count(*)::int AS attempts")) {
         return { rows: [{ attempts: input.attempts ?? 0 } as Row] };
+      }
+      if (sql.includes("FROM bird_generation_quota_overrides")) {
+        return {
+          rows:
+            input.dailyLimit === undefined
+              ? []
+              : [{ daily_limit: input.dailyLimit } as Row],
+        };
       }
       if (sql.includes("INSERT INTO bird_generation_attempts")) {
         return { rows: [{ id: "attempt-1" } as Row] };
@@ -121,5 +130,40 @@ describe("reserveGenerationAttempt", () => {
           sql.includes("AT TIME ZONE 'UTC'"),
       ),
     ).toBe(true);
+  });
+
+  it("allows attempts up to a user's raised daily limit", async () => {
+    const { pool } = fakePool({
+      source: eligibleSource,
+      attempts: 3,
+      dailyLimit: 10,
+    });
+
+    await expect(
+      reserveGenerationAttempt(pool, {
+        userId: "user-1",
+        sourceIdentificationId: "source-1",
+      }),
+    ).resolves.toMatchObject({ kind: "ready", attemptId: "attempt-1" });
+  });
+
+  it("blocks attempts at a user's lowered daily limit", async () => {
+    const { pool, statements } = fakePool({
+      source: eligibleSource,
+      attempts: 2,
+      dailyLimit: 2,
+    });
+
+    await expect(
+      reserveGenerationAttempt(pool, {
+        userId: "user-1",
+        sourceIdentificationId: "source-1",
+      }),
+    ).resolves.toEqual({ kind: "quota" });
+    expect(
+      statements.some((sql) =>
+        sql.includes("INSERT INTO bird_generation_attempts"),
+      ),
+    ).toBe(false);
   });
 });

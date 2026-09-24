@@ -82,7 +82,7 @@ const RESERVATION_ERRORS = {
   },
   quota: {
     status: 429,
-    error: "You’ve used today’s three transformations. Try again tomorrow.",
+    error: "You’ve used today’s transformation allowance. Try again tomorrow.",
   },
 } as const;
 

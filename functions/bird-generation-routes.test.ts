@@ -103,6 +103,23 @@ describe("bird generation routes", () => {
     expect(generateBird).not.toHaveBeenCalled();
   });
 
+  it("describes quota exhaustion without hard-coding the default limit", async () => {
+    const app = createBirdGenerationRoutes(
+      dependencies({
+        reserveAttempt: async () => ({ kind: "quota" }),
+      }),
+    );
+
+    const response = await app.request(
+      "/identifications/source-1/make-bird",
+      postBody(),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: "You’ve used today’s transformation allowance. Try again tomorrow.",
+    });
+  });
+
   it("rejects a non-string prompt before reserving an attempt", async () => {
     const reserveAttempt = vi.fn();
     const app = createBirdGenerationRoutes(dependencies({ reserveAttempt }));

@@ -72,6 +72,30 @@ Cost controls:
 - generated JPEGs stay private under `generated/` in the existing `birds`
   bucket.
 
+Operators can override the daily limit for a specific authenticated user
+without an admin UI. Find the user id from a known recent identification,
+then upsert a positive finite limit:
+
+```sql
+SELECT user_id, max(created_at) AS last_identification
+FROM identifications
+GROUP BY user_id
+ORDER BY last_identification DESC;
+
+INSERT INTO bird_generation_quota_overrides (user_id, daily_limit)
+VALUES ('<user-id>', 100)
+ON CONFLICT (user_id) DO UPDATE
+SET daily_limit = EXCLUDED.daily_limit,
+    updated_at = now();
+```
+
+Delete the row to restore the default limit of three:
+
+```sql
+DELETE FROM bird_generation_quota_overrides
+WHERE user_id = '<user-id>';
+```
+
 ## GitHub Pages
 
 1. Push `main` to a GitHub repository.

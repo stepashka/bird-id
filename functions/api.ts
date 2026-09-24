@@ -492,6 +492,7 @@ app.route(
                 identifications.common_names,
                 identifications.alternatives,
                 identifications.evidence,
+                identifications.is_generated,
                 identification_shares.preview_key
          FROM identification_shares
          JOIN identifications

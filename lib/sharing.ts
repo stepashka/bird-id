@@ -13,6 +13,7 @@ export type SharedIdentificationRow = {
   alternatives: string[] | null;
   evidence: string[] | null;
   preview_key: string | null;
+  is_generated: boolean;
 };
 
 export function createShareToken() {
@@ -41,5 +42,6 @@ export function toPublicSighting(
     names: row.common_names ?? {},
     alternatives: row.alternatives ?? [],
     evidence: row.evidence ?? [],
+    isGenerated: row.is_generated,
   };
 }

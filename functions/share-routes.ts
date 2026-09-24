@@ -167,8 +167,13 @@ function socialShareHtml(
 ) {
   const title = escapeHtml(row.common_name);
   const description = escapeHtml(
-    `${row.scientific_name} · Identified with Fieldmark`,
+    row.is_generated
+      ? `${row.scientific_name} · AI-generated fictional bird · Made with Fieldmark`
+      : `${row.scientific_name} · Identified with Fieldmark`,
   );
+  const fictionalLabel = row.is_generated
+    ? "<p>AI-generated fictional bird</p>"
+    : "";
   const pageUrl = new URL(`/s/${token}`, originUrl).toString();
   const photoUrl = new URL(`/s/${token}/photo`, originUrl).toString();
   const appUrl = new URL(publicAppUrl);
@@ -205,6 +210,7 @@ function socialShareHtml(
   <main>
     <h1>${title}</h1>
     <p><i>${escapeHtml(row.scientific_name)}</i></p>
+    ${fictionalLabel}
     <p><a href="${safeAppUrl}">View this identification on Fieldmark</a></p>
   </main>
   <script>window.location.replace(${redirectScript})</script>

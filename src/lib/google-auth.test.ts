@@ -24,4 +24,34 @@ describe("googleSignInOptions", () => {
     expect(options.callbackURL).not.toBe("https://stepashka.github.io/");
     expect(options.newUserCallbackURL).not.toBe("https://stepashka.github.io/");
   });
+
+  it("returns feedback sign-ins to the feedback view", () => {
+    expect(
+      googleSignInOptions(
+        {
+          origin: "https://stepashka.github.io",
+          search: "?view=feedback",
+        },
+        "/bird-id/",
+      ),
+    ).toEqual({
+      provider: "google",
+      callbackURL: "https://stepashka.github.io/bird-id/?view=feedback",
+      newUserCallbackURL:
+        "https://stepashka.github.io/bird-id/?view=feedback",
+      errorCallbackURL: "https://stepashka.github.io/bird-id/?view=feedback",
+    });
+  });
+
+  it("does not propagate unknown views into auth callbacks", () => {
+    expect(
+      googleSignInOptions(
+        {
+          origin: "https://stepashka.github.io",
+          search: "?view=admin",
+        },
+        "/bird-id/",
+      ).callbackURL,
+    ).toBe("https://stepashka.github.io/bird-id/");
+  });
 });

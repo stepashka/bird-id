@@ -1,6 +1,5 @@
 import { authClient } from "@/lib/neon-auth";
-
-export type AppView = "identify" | "log" | "feedback";
+import type { AppView } from "@/lib/app-view";
 
 export function Header({
   view,

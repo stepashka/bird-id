@@ -3,8 +3,13 @@ import { googleSignInOptions } from "@/lib/google-auth";
 import { authClient } from "@/lib/neon-auth";
 
 type Mode = "sign-in" | "sign-up";
+type AuthPurpose = "identify" | "feedback";
 
-export function AuthPanel() {
+export function AuthPanel({
+  purpose = "identify",
+}: {
+  purpose?: AuthPurpose;
+}) {
   const [mode, setMode] = useState<Mode>("sign-in");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +68,20 @@ export function AuthPanel() {
   return (
     <section className="mt-10 max-w-lg border-t border-ink/20 pt-8">
       <h2 className="font-display text-4xl">
-        {mode === "sign-in" ? "Open your field log" : "Start a field log"}
+        {mode === "sign-in"
+          ? purpose === "feedback"
+            ? "Sign in to send feedback"
+            : "Open your field log"
+          : "Start a field log"}
       </h2>
       <p className="mt-2 text-dusk">
         {mode === "sign-in"
-          ? "Sign in before identifying a bird."
-          : "Your sightings stay attached to this account."}
+          ? purpose === "feedback"
+            ? "Signing in helps us follow up and protects this form from spam."
+            : "Sign in before identifying a bird."
+          : purpose === "feedback"
+            ? "Create an account, then send your feedback."
+            : "Your sightings stay attached to this account."}
       </p>
 
       <form className="mt-6 grid gap-4" onSubmit={submit}>

@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { FeedbackPanel } from "@/components/feedback-panel";
-import { Header, type AppView } from "@/components/header";
+import { Header } from "@/components/header";
 import { HistoryPanel } from "@/components/history-panel";
 import { IdentifyPanel } from "@/components/identify-panel";
 import { SharedIdentificationPage } from "@/components/shared-identification-page";
+import {
+  appViewUrl,
+  readAppView,
+  type AppView,
+} from "@/lib/app-view";
 import { authClient } from "@/lib/neon-auth";
 import { readShareToken } from "@/lib/share-link";
 
@@ -15,13 +20,24 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-  const [view, setView] = useState<AppView>("identify");
+  const [view, setView] = useState<AppView>(() =>
+    readAppView(window.location.search),
+  );
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
 
+  function chooseView(nextView: AppView) {
+    window.history.replaceState(
+      null,
+      "",
+      appViewUrl(window.location, nextView),
+    );
+    setView(nextView);
+  }
+
   return (
     <>
-      <Header view={view} onView={setView} userEmail={user?.email} />
+      <Header view={view} onView={chooseView} userEmail={user?.email} />
 
       {view === "feedback" ? (
         <main className="mx-auto w-full max-w-5xl px-6 pb-20">
@@ -30,8 +46,13 @@ function AuthenticatedApp() {
             Found something confusing, delightful, or broken? Send a short note
             and, if useful, a screenshot.
           </p>
-          <FeedbackPanel signedIn={Boolean(user)} />
-          {!isPending && !user ? <AuthPanel /> : null}
+          {isPending ? (
+            <p className="mt-8 text-lichen">Checking your session…</p>
+          ) : user ? (
+            <FeedbackPanel signedIn />
+          ) : (
+            <AuthPanel purpose="feedback" />
+          )}
         </main>
       ) : view === "log" ? (
         user ? (

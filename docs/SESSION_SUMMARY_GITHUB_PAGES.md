@@ -57,6 +57,7 @@ These are not “Neon was confusing.” These are things a competent Pages + man
 | **Custom-domain auth migration** | DNS and TLS were validated, but production Neon Auth still trusted only the old Pages origin. The first Google click on `bird-id.app` failed with `403 INVALID_CALLBACKURL`. Adding every new app origin to the branch-scoped Auth domain allowlist and probing `/sign-in/social` must be part of the cutover, before declaring the domain live. |
 | **Cornell donate link** | The Merlin/Cornell donation link was requested, then dropped while the custom-domain work took over. Follow-ups that are not started immediately should stay on the open list until they ship. |
 | **Neon image generation** | `/v1/models` listing no `image` model does not mean images are unsupported. Neon generates and edits images through the GPT Responses `image_generation` tool (`neon.tools.imageGeneration()`), not a `generateImage()` endpoint. The UI can show this even when the catalog does not. |
+| **Long-running generation recovery** | A production image edit took about 68 seconds, crossing the Function request boundary while the backend continued and successfully committed the child and JPEG. The API then treated the user's retry as a conflict, stranding a valid result. Paid, long-running mutations must be idempotent: retries should return the already-created resource with a fresh signed URL rather than report “already exists.” |
 
 ## What you had to do outside the agent
 

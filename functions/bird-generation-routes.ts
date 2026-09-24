@@ -60,6 +60,10 @@ export type BirdGenerationRouteDependencies = {
     sourceIdentificationId: string;
     generated: GeneratedBird;
   }): Promise<GeneratedSighting>;
+  readExistingGenerated(input: {
+    userId: string;
+    sourceIdentificationId: string;
+  }): Promise<GeneratedSighting | null>;
   failAttempt(attemptId: string): Promise<void>;
 };
 
@@ -106,6 +110,14 @@ export function createBirdGenerationRoutes(
         sourceIdentificationId,
       });
 
+      if (reservation.kind === "already_generated") {
+        const existing = await deps.readExistingGenerated({
+          userId,
+          sourceIdentificationId,
+        });
+        if (existing) return c.json(existing, 200);
+      }
+
       if (reservation.kind !== "ready") {
         const response = RESERVATION_ERRORS[reservation.kind];
         return c.json({ error: response.error }, response.status);
@@ -128,6 +140,11 @@ export function createBirdGenerationRoutes(
       } catch (error) {
         await deps.failAttempt(reservation.attemptId).catch(() => undefined);
         if (error instanceof GeneratedAlreadyExistsError) {
+          const existing = await deps.readExistingGenerated({
+            userId,
+            sourceIdentificationId,
+          });
+          if (existing) return c.json(existing, 200);
           return c.json(
             { error: RESERVATION_ERRORS.already_generated.error },
             RESERVATION_ERRORS.already_generated.status,
